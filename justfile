@@ -106,6 +106,14 @@ e2e:
         sleep 0.1
       } | nc 127.0.0.1 6379 >/dev/null || true
     fi
+    # 先前台 build（CI 无 TTY 时后台 cargo run 会全缓冲且编译远超 healthz 等待窗），
+    # 再跑 debug 二进制，避免 wait 卡在还在编译的 cargo 上十几分钟无日志。
+    echo "e2e: building api (blob-fs, no otlp)..."
+    cargo build -p api --no-default-features --features blob-fs
+    api_bin="${CARGO_TARGET_DIR:-target}/debug/api"
+    api_log="${TMPDIR:-/tmp}/jsonrpc-e2e-api.log"
+    : >"$api_log"
+    echo "e2e: starting $api_bin on $listen (log: $api_log)"
     MASTER=true \
     SEED_ADMIN_PHONE=13800000777 \
     SEED_ADMIN_PASSWORD=seed-pass-1 \
@@ -118,19 +126,45 @@ e2e:
     BLOB_FS_DOMAIN="${base_url}/files" \
     BLOB_FS_PRESIGN_SECRET="${BLOB_FS_PRESIGN_SECRET:-e2e-blob-presign-secret-at-least-32b}" \
     CACHE_REDIS_URL="redis://127.0.0.1:6379/14" \
-    cargo run -p api --no-default-features --features blob-fs -- --listen-addr "$listen" &
+    "$api_bin" --listen-addr "$listen" >>"$api_log" 2>&1 &
     api_pid=$!
-    cleanup() { kill "$api_pid" 2>/dev/null || true; wait "$api_pid" 2>/dev/null || true; }
+    cleanup() {
+        if kill -0 "$api_pid" 2>/dev/null; then
+            kill "$api_pid" 2>/dev/null || true
+            for _ in $(seq 1 50); do
+                kill -0 "$api_pid" 2>/dev/null || break
+                sleep 0.1
+            done
+            kill -9 "$api_pid" 2>/dev/null || true
+            wait "$api_pid" 2>/dev/null || true
+        fi
+    }
     trap cleanup EXIT
-    for _ in $(seq 1 80); do
+    ready=0
+    for i in $(seq 1 80); do
         if curl -sf "$base_url/healthz" >/dev/null; then
+            ready=1
+            echo "e2e: api ready (${i}/80)"
             break
+        fi
+        if ! kill -0 "$api_pid" 2>/dev/null; then
+            echo "e2e: api exited before /healthz; log:" >&2
+            cat "$api_log" >&2 || true
+            exit 1
+        fi
+        if (( i % 10 == 0 )); then
+            echo "e2e: waiting for /healthz (${i}/80)..."
         fi
         sleep 0.25
     done
-    curl -sf "$base_url/healthz" >/dev/null
+    if [[ "$ready" -ne 1 ]]; then
+        echo "e2e: /healthz not ready after ~20s; log:" >&2
+        cat "$api_log" >&2 || true
+        exit 1
+    fi
     # >2MiB fixture：同时大于 BODY_LIMIT_BYTES(1MiB) 与 Axum 提取器默认(~2MiB)，
     # 断言走 PublicRouter 的 PUBLIC_BODY_LIMIT_BYTES(16MiB)。
     dd if=/dev/zero of=e2e/fixtures/over-2m.bin bs=1024 count=2560 status=none
     # 单会话模型：--test 默认并行会互相吊销 access；--jobs 1 串行。
+    echo "e2e: running hurl..."
     hurl --test --jobs 1 --variable base_url="$base_url" e2e/*.hurl
