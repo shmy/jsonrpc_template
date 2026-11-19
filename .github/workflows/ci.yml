@@ -96,5 +96,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y "./hurl_${VERSION}_amd64.deb"
           hurl --version
+      - name: Build e2e binaries
+        # 与 just e2e 同 features；单独 step 让编译日志不被挤在 e2e 里
+        run: |
+          cargo build --bin migrator
+          cargo build -p api --no-default-features --features blob-fs
       - name: e2e
         run: just e2e
