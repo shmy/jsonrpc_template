@@ -193,7 +193,7 @@ cargo run -p api --no-default-features --features blob-fs
 cargo run -p api --no-default-features --features blob-cos
 just migration-generate       # 模型变更后生成 SQL
 just migration-apply          # 不经 api 启动、单独 apply
-just migration-reset          # `migrator migration reset`
+just migration-reset          # psql DROP SCHEMA + `migrator migration apply`
 just e2e                      # reset → 临时 api（blob-fs，关 otlp）→ hurl
 cargo test --workspace --all-targets   # 含 seal 等 integration
 cargo test -p axum_jsonrpc -p identity -p file --lib --features blob-fs

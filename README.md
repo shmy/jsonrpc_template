@@ -211,8 +211,8 @@ just migration-generate   # 从模型生成 migration
 just migration-apply      # 对 DATABASE_URL apply pending migrations
 cargo test --workspace --all-targets  # 单元 + seal 等（不含 HTTP e2e）
 cargo run -p api          # 另开终端
-just migration-reset      # `migrator migration reset`（清库并重 apply；脚本内自动确认）
-just e2e                  # reset → 临时 api → hurl（需 hurl、Postgres、Redis、JWT_SECRET）
+just migration-reset      # psql DROP SCHEMA + `migrator migration apply`（需 psql）
+just e2e                  # reset → 临时 api → hurl（需 hurl、psql、Postgres、Redis、JWT_SECRET）
 ```
 
 方法命名：点分域 `identity.account.create`；API 版本取 `api` 包版本写入 OpenRPC `info.version`（不在方法名里嵌版本前缀）。
