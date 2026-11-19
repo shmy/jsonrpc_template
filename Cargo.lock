@@ -1504,6 +1504,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gen_mobile_clients"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde_json",
+]
+
+[[package]]
 name = "genawaiter"
 version = "0.99.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

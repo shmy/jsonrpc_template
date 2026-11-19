@@ -1,0 +1,17 @@
+[package]
+name = "gen_mobile_clients"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Generate Swift / Kotlin / Dart JSON-RPC clients from an OpenRPC JSON document"
+
+[[bin]]
+name = "gen_mobile_clients"
+path = "main.rs"
+
+[dependencies]
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

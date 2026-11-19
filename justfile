@@ -24,6 +24,21 @@ check-fast crate="identity":
 layering:
     python3 scripts/check_layering.py
 
+# 拉取 /openrpc.json → .clients/（文档 + Swift/Kotlin/Dart；api 需在听；已有缓存可只跑后半段）
+gen-clients url="http://127.0.0.1:9000/openrpc.json":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p .clients
+    if curl -fsS --connect-timeout 2 "{{url}}" -o .clients/openrpc.json; then
+      echo "fetched {{url}} → .clients/openrpc.json"
+    elif [[ -f .clients/openrpc.json ]]; then
+      echo "warn: fetch failed; using cached .clients/openrpc.json" >&2
+    else
+      echo "error: cannot fetch {{url}} and no .clients/openrpc.json" >&2
+      exit 1
+    fi
+    cargo run -p gen_mobile_clients
+
 # 改 docs/openrpc-viewer.js 后重生成 min.js（需 node/npx）
 docs-min:
     #!/usr/bin/env bash

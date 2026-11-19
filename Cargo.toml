@@ -1,6 +1,8 @@
 [workspace]
 members = [
-    "bin/api", "bin/migrator",
+    "bin/api",
+    "bin/migrator",
+    "bin/gen_mobile_clients",
     "crates/authn_kit",
     "crates/axum_jsonrpc",
     "crates/axum_jsonrpc_macros",
@@ -30,7 +32,9 @@ resolver = "3"
 
 [workspace.dependencies]
 # 默认仅 console；OTLP/metrics 由 api feature `otlp` 开启
-trace_kit = { version = "0.1.0", path = "crates/trace_kit", default-features = false, features = ["console"] }
+trace_kit = { version = "0.1.0", path = "crates/trace_kit", default-features = false, features = [
+    "console",
+] }
 http_server = { version = "0.1.0", path = "infra/http_server" }
 http_routing = { version = "0.1.0", path = "infra/http_routing" }
 axum_jsonrpc = { version = "0.1.0", path = "crates/axum_jsonrpc" }
@@ -136,7 +140,9 @@ argon2 = { version = "0.6", default-features = false, features = [
 ] }
 authn_kit = { version = "0.1.0", path = "crates/authn_kit" }
 jwt_kit = { version = "0.1.0", path = "crates/jwt_kit" }
-cache_kit = { version = "0.1.0", path = "crates/cache_kit", default-features = false, features = ["redis"] }
+cache_kit = { version = "0.1.0", path = "crates/cache_kit", default-features = false, features = [
+    "redis",
+] }
 cache = { version = "0.1.0", path = "infra/cache" }
 http_auth = { version = "0.1.0", path = "infra/http_auth" }
 http_extractors = { version = "0.1.0", path = "infra/http_extractors" }

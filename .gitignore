@@ -2,6 +2,8 @@
 .DS_Store
 .env
 .cursor/mcp.json
+# OpenRPC 拉取 + 生成的 Swift/Kotlin（just gen-clients）
+.clients/
 /data/
 # just e2e 生成的大文件预签名 PUT fixture
 /e2e/fixtures/over-2m.bin
