@@ -1,0 +1,21 @@
+[package]
+name = "blob"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+default = ["fs"]
+cos = ["blob_kit/cos", "config/cos"]
+fs = ["blob_kit/fs", "config/fs"]
+
+[dependencies]
+blob_kit = { workspace = true }
+config = { workspace = true }
+modrun = { workspace = true }

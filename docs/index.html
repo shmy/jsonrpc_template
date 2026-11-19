@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JSON-RPC API 文档</title>
+</head>
+<body>
+  <!-- 引入即渲染；schema 地址可用 script[data-url] 或页面 ?url= 参数覆盖。
+       注意：本页与 API 不同源时（如 file:// 直接打开），浏览器会拦截跨域请求，
+       需服务端配置 CORS_ORIGINS；最省事的方式是直接打开 API 自带的 /docs。 -->
+  <div id="openrpc-viewer"></div>
+  <script id="openrpc-viewer" src="./openrpc-viewer.js" data-url="http://localhost:9000/openrpc.json"></script>
+</body>
+</html>

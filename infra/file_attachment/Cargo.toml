@@ -1,0 +1,27 @@
+[package]
+name = "file_attachment"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+# 至少启用一个后端，便于独立 `cargo test -p file_attachment`；与 api 的 cos/fs 会 feature 统一
+blob_kit = { workspace = true, features = ["fs"] }
+cache_kit = { workspace = true }
+file_contract = { workspace = true }
+# 模板特例：staging claim 主键借用 `identity_contract::Id`（与 http_auth 同类例外）
+identity_contract = { workspace = true }
+rootcause = { workspace = true }
+toasty = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+# bind 单测用内存后端构造 Blob
+blob_kit = { workspace = true, features = ["test-utils"] }
+tokio = { workspace = true, features = ["macros", "rt"] }

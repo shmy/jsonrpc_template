@@ -1,0 +1,43 @@
+[package]
+name = "identity"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+rootcause = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+modrun = { workspace = true }
+app_state = { workspace = true }
+blob_kit = { workspace = true }
+config = { workspace = true }
+file_attachment = { workspace = true }
+http_routing = { workspace = true }
+http_auth = { workspace = true }
+http_extractors = { workspace = true }
+axum = { workspace = true }
+axum_jsonrpc = { workspace = true }
+schemars = { workspace = true }
+identity_contract = { workspace = true }
+locale = { workspace = true }
+validify = { workspace = true }
+toasty = { workspace = true }
+argon2 = { workspace = true }
+tokio = { workspace = true }
+authn_kit = { workspace = true }
+cache_kit = { workspace = true }
+jwt_kit = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+# token_ops 单测用内存后端；避免把 MemoryCache 编进生产二进制
+cache_kit = { workspace = true, features = ["memory"] }
+secrecy = { workspace = true }
+
+[lints]
+workspace = true
+

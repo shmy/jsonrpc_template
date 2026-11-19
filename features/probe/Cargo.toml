@@ -1,0 +1,20 @@
+[package]
+name = "probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+app_state = { workspace = true }
+axum = { workspace = true }
+cache_kit = { workspace = true }
+http_routing = { workspace = true }
+modrun = { workspace = true }
+toasty = { workspace = true }
+serde = { workspace = true }
+
+[lints]
+workspace = true

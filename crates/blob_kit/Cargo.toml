@@ -1,0 +1,40 @@
+[package]
+name = "blob_kit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+# 模板默认 fs（本地开发）；生产切 cos 由上层 feature 门控
+default = ["fs"]
+fs = ["opendal/services-fs"]
+# no-provider transport：不编 rustls 的任何 provider，由下方 rustls(仅 ring) 统一供给
+cos = [
+    "opendal/services-cos",
+    "opendal/http-transport-reqwest-rustls-no-provider",
+    "dep:rustls",
+]
+test-utils = ["opendal/services-memory"]
+
+[dependencies]
+futures-util = { workspace = true }
+hmac = { workspace = true }
+opendal = { workspace = true }
+rootcause = { workspace = true }
+rustls = { workspace = true, optional = true }
+sha2 = { workspace = true }
+subtle = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+tempfile = { workspace = true }

@@ -1,0 +1,17 @@
+[package]
+name = "cache"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+cache_kit = { workspace = true }
+config = { workspace = true }
+modrun = { workspace = true }
+rootcause = { workspace = true }

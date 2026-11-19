@@ -1,0 +1,24 @@
+[package]
+name = "axum_jsonrpc_openrpc"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "OpenRPC document generation for axum_jsonrpc"
+license = "MIT OR Apache-2.0"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+axum = { workspace = true }
+axum_jsonrpc = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+schemars = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tower = { workspace = true }
+
+[lints]
+workspace = true

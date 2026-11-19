@@ -1,0 +1,26 @@
+[package]
+name = "axum_jsonrpc_macros"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Proc-macros for axum_jsonrpc (#[rpc])"
+license = "MIT OR Apache-2.0"
+
+[lib]
+path = "lib.rs"
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { version = "1", default-features = false }
+quote = { version = "1", default-features = false }
+syn = { version = "2", default-features = false, features = [
+    "clone-impls",
+    "derive",
+    "full",
+    "parsing",
+    "printing",
+    "proc-macro",
+] }
+
+[lints]
+workspace = true

@@ -1,0 +1,215 @@
+[workspace]
+members = [
+    "bin/api", "bin/migrator",
+    "crates/authn_kit",
+    "crates/axum_jsonrpc",
+    "crates/axum_jsonrpc_macros",
+    "crates/axum_jsonrpc_openrpc",
+    "crates/blob_kit",
+    "crates/cache_kit",
+    "crates/jwt_kit",
+    "crates/trace_kit",
+    "features/file",
+    "features/file_contract",
+    "features/identity",
+    "features/identity_contract",
+    "features/probe",
+    "infra/app_state",
+    "infra/blob",
+    "infra/cache",
+    "infra/config",
+    "infra/file_attachment",
+    "infra/http_auth",
+    "infra/http_extractors",
+    "infra/http_routing",
+    "infra/http_server",
+    "infra/locale",
+    "infra/persistence",
+]
+resolver = "3"
+
+[workspace.dependencies]
+# 默认仅 console；OTLP/metrics 由 api feature `otlp` 开启
+trace_kit = { version = "0.1.0", path = "crates/trace_kit", default-features = false, features = ["console"] }
+http_server = { version = "0.1.0", path = "infra/http_server" }
+http_routing = { version = "0.1.0", path = "infra/http_routing" }
+axum_jsonrpc = { version = "0.1.0", path = "crates/axum_jsonrpc" }
+axum_jsonrpc_macros = { version = "0.1.0", path = "crates/axum_jsonrpc_macros" }
+axum_jsonrpc_openrpc = { version = "0.1.0", path = "crates/axum_jsonrpc_openrpc" }
+schemars = { version = "1", default-features = false, features = ["derive"] }
+axum = { version = "0.8", default-features = false, features = [
+    "tokio",
+    "http1",
+    "json",
+    "query",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "fs",
+    "macros",
+    "net",
+    "rt",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+    "io-util",
+] }
+modrun = { version = "1.1", default-features = false, features = ["signal"] }
+serde = { version = "1", default-features = false, features = [
+    "derive",
+    "std",
+] }
+serde_json = { version = "1", default-features = false, features = [
+    "std",
+    "raw_value",
+] }
+serde_path_to_error = { version = "0.1", default-features = false }
+validify = { version = "2", default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+tracing = { version = "0.1", default-features = false, features = [
+    "std",
+    "attributes",
+] }
+dotenvy = { version = "0.15", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "ansi",
+    "fmt",
+    "env-filter",
+] }
+rootcause = { version = "0.13", default-features = false }
+rootcause-tracing = { version = "0.13", default-features = false }
+opentelemetry = { version = "0.33", default-features = false, features = [
+    "trace",
+    "metrics",
+] }
+http_1 = { package = "http", version = "1", default-features = false, features = [
+    "std",
+] }
+opentelemetry-appender-tracing = { version = "0.33", default-features = false }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
+    "logs",
+    "metrics",
+    "trace",
+    "grpc-tonic",
+] }
+opentelemetry-semantic-conventions = { version = "0.33", default-features = false }
+opentelemetry_sdk = { version = "0.33", default-features = false }
+tonic = { version = "0.14", default-features = false }
+tracing-opentelemetry = { version = "0.34", default-features = false, features = [
+    "metrics",
+] }
+# TRACE "HTTP request": Rootcause captures it; OTLP info filter does not export (avoids POST /jsonrpc root).
+axum-tracing-opentelemetry = { version = "0.42", default-features = false }
+getrandom = { version = "0.4", default-features = false, features = ["std"] }
+tower = { version = "0.5", default-features = false, features = ["util"] }
+identity = { version = "0.1.0", path = "features/identity" }
+clap = { version = "4.5", default-features = false, features = [
+    "derive",
+    "env",
+    "error-context",
+    "help",
+    "std",
+] }
+secrecy = { version = "0.10", default-features = false }
+app_state = { version = "0.1.0", path = "infra/app_state" }
+config = { version = "0.1.0", path = "infra/config" }
+locale = { version = "0.1.0", path = "infra/locale" }
+probe = { version = "0.1.0", path = "features/probe" }
+thiserror = { version = "2", default-features = false }
+unic-langid = { version = "0.9", default-features = false }
+fluent-bundle = { version = "0.16", default-features = false }
+
+toasty = { version = "0.11", default-features = false, features = [
+    "postgresql",
+    "jiff",
+    "migration",
+] }
+toasty-cli = { version = "0.11", default-features = false }
+jiff = { version = "0.2", default-features = false, features = ["serde"] }
+persistence = { version = "0.1.0", path = "infra/persistence" }
+identity_contract = { version = "0.1.0", path = "features/identity_contract" }
+tsid = { version = "0.3", default-features = false }
+argon2 = { version = "0.6", default-features = false, features = [
+    "alloc",
+    "password-hash",
+    "getrandom",
+] }
+authn_kit = { version = "0.1.0", path = "crates/authn_kit" }
+jwt_kit = { version = "0.1.0", path = "crates/jwt_kit" }
+cache_kit = { version = "0.1.0", path = "crates/cache_kit", default-features = false, features = ["redis"] }
+cache = { version = "0.1.0", path = "infra/cache" }
+http_auth = { version = "0.1.0", path = "infra/http_auth" }
+http_extractors = { version = "0.1.0", path = "infra/http_extractors" }
+tower-http = { version = "0.7", default-features = false, features = [
+    "timeout",
+    "cors",
+    "fs",
+] }
+ipnet = { version = "2", default-features = false }
+sha2 = { version = "0.11", default-features = false }
+hmac = { version = "0.13", default-features = false }
+subtle = { version = "2", default-features = false }
+base64 = { version = "0.23", default-features = false, features = ["std"] }
+uuid = { version = "1", default-features = false, features = ["v4"] }
+bb8-redis = { version = "0.26", default-features = false }
+redis = { version = "1.5", default-features = false, features = [
+    "script",
+    "tokio-comp",
+] }
+# TLS：reqwest 公开 rustls feature 会绑 aws-lc；blob_kit(cos) 走 opendal
+# no-provider transport + 此处 rustls/ring，使 ring 成全图唯一 provider。
+rustls = { version = "0.23", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+    "logging",
+] }
+tokio-util = { version = "0.7", default-features = false, features = ["io"] }
+# services-* / http-transport 由 blob_kit 的 cos/fs/test-utils feature 按需启用
+opendal = { version = "0.59", default-features = false, features = [
+    "executors-tokio",
+    "layers-logging",
+] }
+tempfile = { version = "3", default-features = false }
+tempoid = { version = "0.1", default-features = false }
+blob_kit = { version = "0.1.0", path = "crates/blob_kit", default-features = false }
+blob = { version = "0.1.0", path = "infra/blob", default-features = false }
+file_attachment = { version = "0.1.0", path = "infra/file_attachment" }
+file = { version = "0.1.0", path = "features/file", default-features = false }
+file_contract = { version = "0.1.0", path = "features/file_contract" }
+mime_guess = { version = "2.0", default-features = false }
+
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+dbg_macro = "deny"
+todo = "warn"
+
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+opt-level = 0
+incremental = true
+overflow-checks = true
+panic = "unwind"
+codegen-units = 256
+lto = "off"
+strip = false
+
+# 依赖只编一次但跑得快：argon2 / toasty 等测试与运行时显著提速
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.release]
+debug = 0
+rpath = false
+incremental = false
+overflow-checks = false
+panic = "abort"
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+strip = true

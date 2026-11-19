@@ -1,0 +1,23 @@
+[package]
+name = "http_auth"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+app_state = { workspace = true }
+authn_kit = { workspace = true }
+axum = { workspace = true }
+axum_jsonrpc = { workspace = true }
+# 模板特例：仅借用 Id 类型（AuthedAccount 主键）；-32020.. 码段与 FTL 在本 crate（authn_kit 无 RPC/locale）
+identity_contract = { workspace = true }
+locale = { workspace = true }
+rootcause = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }

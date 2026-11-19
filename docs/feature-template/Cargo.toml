@@ -1,0 +1,27 @@
+[package]
+name = "FEATURE_NAME"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+app_state = { workspace = true }
+axum_jsonrpc = { workspace = true }
+http_routing = { workspace = true }
+locale = { workspace = true }
+modrun = { workspace = true }
+# FEATURE_NAME_contract = { workspace = true }
+# http_auth = { workspace = true }
+# rootcause = { workspace = true }
+# schemars = { workspace = true }
+# serde = { workspace = true }
+# validify = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["locale"]
+
+[lints]
+workspace = true

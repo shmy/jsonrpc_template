@@ -1,0 +1,20 @@
+[package]
+name = "persistence"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+toasty = { workspace = true }
+modrun = { workspace = true }
+config = { workspace = true }
+rootcause = { workspace = true }
+identity_contract = { workspace = true }
+file_contract = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

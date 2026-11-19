@@ -1,0 +1,54 @@
+//! Domain error mappers: feature crates register at `module()` time so Dynamic
+//! `Report` can become a stable `-320xx` [`ErrorObject`].
+
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+use crate::ErrorObject;
+
+/// Map a dynamic rootcause report to a JSON-RPC error. Return `None` if this
+/// mapper does not own the error (another mapper or `-32603` will handle it).
+pub type DomainReportMapper = fn(&rootcause::Report) -> Option<ErrorObject>;
+
+/// `Some` until first seal; `None` after [`mappers`] takes ownership into [`SEALED`].
+static PENDING: Mutex<Option<Vec<DomainReportMapper>>> = Mutex::new(Some(Vec::new()));
+static SEALED: OnceLock<Vec<DomainReportMapper>> = OnceLock::new();
+
+fn pending_lock() -> MutexGuard<'static, Option<Vec<DomainReportMapper>>> {
+    PENDING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Register a domain mapper. Call from feature `module()` before [`seal_domain_mappers`].
+///
+/// # Panics
+/// If called after the mapper list has been sealed.
+pub fn register_domain_mapper(mapper: DomainReportMapper) {
+    let mut guard = pending_lock();
+    #[allow(clippy::expect_used)]
+    let pending = guard.as_mut().expect(
+        "register_domain_mapper after mappers sealed \
+         (must happen in Module::module(), before http_server seals)",
+    );
+    pending.push(mapper);
+}
+
+/// Seal the mapper list (idempotent). Call from the app shell before serving traffic.
+pub fn seal_domain_mappers() {
+    let _ = mappers();
+}
+
+fn mappers() -> &'static [DomainReportMapper] {
+    SEALED
+        .get_or_init(|| pending_lock().take().unwrap_or_default())
+        .as_slice()
+}
+
+pub(crate) fn try_domain_mappers(report: &rootcause::Report) -> Option<ErrorObject> {
+    for mapper in mappers() {
+        if let Some(err) = mapper(report) {
+            return Some(err);
+        }
+    }
+    None
+}

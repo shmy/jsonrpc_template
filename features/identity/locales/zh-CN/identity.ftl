@@ -1,0 +1,9 @@
+account_not_found = 账号不存在
+account_duplicated = 账号已存在
+account_invalid_credentials = 手机号或密码错误
+refresh_token_invalid = 刷新令牌无效
+login_rate_limited = 登录尝试过于频繁，请稍后再试
+auth_rate_limited = 操作过于频繁，请稍后再试
+account_password_unchanged = 新密码不能与当前密码相同
+account_forbidden = 无权操作该账号
+incorrect_original_password = 原密码错误

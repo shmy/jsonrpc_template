@@ -1,0 +1,30 @@
+[package]
+name = "cache_kit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+default = ["redis"]
+redis = ["dep:bb8-redis", "dep:redis", "dep:uuid", "dep:jiff"]
+# 进程内门面，供 token_ops 等单测；生产走 redis
+memory = []
+
+[dependencies]
+# `std` 开启系统时钟（`Zoned::now`）；workspace 基线只带 `serde`
+jiff = { workspace = true, optional = true, features = ["std"] }
+rootcause = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bb8-redis = { workspace = true, optional = true }
+redis = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

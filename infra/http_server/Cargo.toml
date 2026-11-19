@@ -1,0 +1,42 @@
+[package]
+name = "http_server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = []
+# 由 api feature `otlp` 开启；RPC metrics + 入站 W3C Trace Context
+otel = [
+    "dep:trace_kit",
+    "dep:axum-tracing-opentelemetry",
+    "dep:http_1",
+    "trace_kit/otlp",
+]
+
+[dependencies]
+modrun = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+axum = { workspace = true }
+http_routing = { workspace = true }
+http_auth = { workspace = true }
+axum_jsonrpc = { workspace = true }
+axum_jsonrpc_openrpc = { workspace = true }
+app_state = { workspace = true }
+blob_kit = { workspace = true }
+cache_kit = { workspace = true }
+config = { workspace = true }
+jwt_kit = { workspace = true }
+locale = { workspace = true }
+tower-http = { workspace = true }
+trace_kit = { workspace = true, optional = true }
+axum-tracing-opentelemetry = { workspace = true, optional = true }
+http_1 = { workspace = true, optional = true }
+toasty = { workspace = true }
+
+[lints]
+workspace = true

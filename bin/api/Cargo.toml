@@ -1,0 +1,35 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "api"
+path = "main.rs"
+
+[features]
+default = ["otlp", "blob-fs"]
+otlp = ["trace_kit/otlp", "http_server/otel"]
+# Blob 后端 meta-feature：只在此切换；对齐表见 docs/blob-backends.md
+# blob-fs → blob/fs + file/blob-fs（→ app_state/blob-fs + config/fs）
+# blob-cos → blob/cos + file/blob-cos（对称）
+blob-fs = ["blob/fs", "file/blob-fs"]
+blob-cos = ["blob/cos", "file/blob-cos"]
+
+[dependencies]
+tokio = { workspace = true }
+modrun = { workspace = true }
+http_server = { workspace = true }
+http_routing = { workspace = true }
+identity = { workspace = true }
+file = { workspace = true }
+config = { workspace = true }
+cache = { workspace = true }
+blob = { workspace = true }
+probe = { workspace = true }
+trace_kit = { workspace = true }
+persistence = { workspace = true }
+
+[lints]
+workspace = true

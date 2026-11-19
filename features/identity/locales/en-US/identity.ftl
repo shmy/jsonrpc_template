@@ -1,0 +1,9 @@
+account_not_found = Account not found
+account_duplicated = Account already exists
+account_invalid_credentials = Invalid phone or password
+refresh_token_invalid = Refresh token is invalid
+login_rate_limited = Too many login attempts, please try again later
+auth_rate_limited = Too many attempts, please try again later
+account_password_unchanged = New password must be different from the current one
+account_forbidden = Forbidden
+incorrect_original_password = Incorrect original password

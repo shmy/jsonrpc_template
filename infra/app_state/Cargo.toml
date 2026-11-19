@@ -1,0 +1,26 @@
+[package]
+name = "app_state"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = ["blob-fs"]
+blob-fs = ["blob_kit/fs"]
+blob-cos = ["blob_kit/cos"]
+
+[dependencies]
+axum = { workspace = true }
+blob_kit = { workspace = true }
+cache_kit = { workspace = true }
+config = { workspace = true }
+http_extractors = { workspace = true }
+jwt_kit = { workspace = true }
+rootcause = { workspace = true }
+toasty = { workspace = true }
+
+[lints]
+workspace = true

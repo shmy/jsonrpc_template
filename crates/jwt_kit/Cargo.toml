@@ -1,0 +1,21 @@
+[package]
+name = "jwt_kit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+base64 = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rootcause = { workspace = true }
+secrecy = { workspace = true }
+serde = { workspace = true }

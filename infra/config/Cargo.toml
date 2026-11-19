@@ -1,0 +1,23 @@
+[package]
+name = "config"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[features]
+default = []
+# 与 api `blob-fs` / `blob-cos` 对齐：开启后对应 BLOB_* 环境变量在 clap 层必填。
+fs = []
+cos = []
+
+[dependencies]
+clap = { workspace = true }
+dotenvy = { workspace = true }
+ipnet = { workspace = true }
+secrecy = { workspace = true }

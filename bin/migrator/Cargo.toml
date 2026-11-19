@@ -1,0 +1,20 @@
+[package]
+name = "migrator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "migrator"
+path = "main.rs"
+
+[dependencies]
+toasty = { workspace = true }
+toasty-cli = { workspace = true }
+tokio = { workspace = true }
+rootcause = { workspace = true }
+dotenvy = { workspace = true }
+persistence = { workspace = true }
+
+[lints]
+workspace = true
