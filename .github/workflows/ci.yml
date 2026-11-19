@@ -105,4 +105,5 @@ jobs:
           cargo build --bin migrator
           cargo build -p api --no-default-features --features blob-fs
       - name: e2e
-        run: just e2e
+        # PYTHONUNBUFFERED 无用；stdbuf 让 just/bash 进度行尽快进 Actions 日志
+        run: stdbuf -oL -eL just e2e

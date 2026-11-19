@@ -65,22 +65,24 @@ migration-apply:
 migration-reset:
     #!/usr/bin/env bash
     set -euo pipefail
+    # CI 管道全缓冲；进度打到 stderr 并尽量行缓冲
+    log() { printf '%s\n' "$*" >&2; }
     set -a && [ -f .env ] && source .env
     : "${DATABASE_URL:?DATABASE_URL required}"
     if ! command -v psql >/dev/null; then
-        echo "migration-reset needs psql on PATH (CI: postgresql-client; macOS: brew install libpq && brew link --force libpq)" >&2
+        log "migration-reset needs psql on PATH (CI: postgresql-client; macOS: brew install libpq && brew link --force libpq)"
         exit 1
     fi
-    echo "migration-reset: DROP SCHEMA public CASCADE..."
+    log "migration-reset: DROP SCHEMA public CASCADE..."
     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
     migrator="${CARGO_TARGET_DIR:-target}/debug/migrator"
     if [[ ! -x "$migrator" ]]; then
-        echo "migration-reset: building migrator..."
+        log "migration-reset: building migrator..."
         cargo build --bin migrator
     fi
-    echo "migration-reset: applying migrations..."
+    log "migration-reset: applying migrations via $migrator..."
     "$migrator" migration apply
-    echo "migration-reset: done"
+    log "migration-reset: done"
 
 # Self-contained: migration-reset → ephemeral api (MASTER=true → seed admin) → hurl.
 # Needs hurl + DATABASE_URL + Redis (CACHE_REDIS_URL) + JWT_SECRET (≥32 bytes).
@@ -90,13 +92,16 @@ migration-reset:
 e2e:
     #!/usr/bin/env bash
     set -euo pipefail
+    log() { printf '%s\n' "$*" >&2; }
     set -a && [ -f .env ] && source .env
-    command -v hurl >/dev/null || { echo "e2e needs hurl on PATH (https://hurl.dev)"; exit 1; }
+    command -v hurl >/dev/null || { log "e2e needs hurl on PATH (https://hurl.dev)"; exit 1; }
     : "${DATABASE_URL:?DATABASE_URL required}"
     : "${JWT_SECRET:?JWT_SECRET required (≥32 bytes)}"
     : "${CACHE_REDIS_URL:?CACHE_REDIS_URL required}"
     listen="${E2E_LISTEN_ADDR:-127.0.0.1:18080}"
     base_url="${E2E_BASE_URL:-http://${listen}}"
+    log "e2e: start (listen=$listen)"
+    log "e2e: [1/6] migration-reset"
     just migration-reset
     # MASTER=true: schema is already applied by migration-reset (re-apply is a no-op)
     # and boots the seed admin used by e2e/seed_admin.hurl.
@@ -105,23 +110,27 @@ e2e:
     # 固定 Redis DB 14；启动前清该库，避免 login IP 窗连坐。
     # 注意：Ubuntu openbsd-nc 默认会在 EOF 后一直等对端关连接 → CI 无 redis-cli 时会挂死；
     # 必须 -N/-w，或直接装 redis-tools。
+    log "e2e: [2/6] flush redis DB 14"
     if command -v redis-cli >/dev/null; then
+      log "e2e: redis-cli -n 14 FLUSHDB"
       redis-cli -n 14 FLUSHDB >/dev/null || true
     else
+      log "e2e: nc -N -w 2 fallback (no redis-cli)"
       # 同一 TCP 连接内 SELECT+FLUSHDB（分连接的 FLUSHDB 只会清 DB 0）。
       {
         printf '*2\r\n$6\r\nSELECT\r\n$2\r\n14\r\n'
         printf '*1\r\n$8\r\nFLUSHDB\r\n'
       } | nc -N -w 2 127.0.0.1 6379 >/dev/null || true
     fi
+    log "e2e: redis flush done"
     # 先前台 build（CI 无 TTY 时后台 cargo run 会全缓冲且编译远超 healthz 等待窗），
     # 再跑 debug 二进制，避免 wait 卡在还在编译的 cargo 上十几分钟无日志。
-    echo "e2e: building api (blob-fs, no otlp)..."
+    log "e2e: [3/6] cargo build -p api (blob-fs, no otlp)"
     cargo build -p api --no-default-features --features blob-fs
     api_bin="${CARGO_TARGET_DIR:-target}/debug/api"
     api_log="${TMPDIR:-/tmp}/jsonrpc-e2e-api.log"
     : >"$api_log"
-    echo "e2e: starting $api_bin on $listen (log: $api_log)"
+    log "e2e: [4/6] start $api_bin on $listen (log=$api_log)"
     MASTER=true \
     SEED_ADMIN_PHONE=13800000777 \
     SEED_ADMIN_PASSWORD=seed-pass-1 \
@@ -136,7 +145,9 @@ e2e:
     CACHE_REDIS_URL="redis://127.0.0.1:6379/14" \
     "$api_bin" --listen-addr "$listen" >>"$api_log" 2>&1 &
     api_pid=$!
+    log "e2e: api pid=$api_pid"
     cleanup() {
+        log "e2e: cleanup api pid=$api_pid"
         if kill -0 "$api_pid" 2>/dev/null; then
             kill "$api_pid" 2>/dev/null || true
             for _ in $(seq 1 50); do
@@ -148,25 +159,26 @@ e2e:
         fi
     }
     trap cleanup EXIT
+    log "e2e: [5/6] wait for $base_url/healthz"
     ready=0
     for i in $(seq 1 80); do
         if curl -sf "$base_url/healthz" >/dev/null; then
             ready=1
-            echo "e2e: api ready (${i}/80)"
+            log "e2e: api ready (${i}/80)"
             break
         fi
         if ! kill -0 "$api_pid" 2>/dev/null; then
-            echo "e2e: api exited before /healthz; log:" >&2
+            log "e2e: api exited before /healthz; log:"
             cat "$api_log" >&2 || true
             exit 1
         fi
         if (( i % 10 == 0 )); then
-            echo "e2e: waiting for /healthz (${i}/80)..."
+            log "e2e: waiting for /healthz (${i}/80)..."
         fi
         sleep 0.25
     done
     if [[ "$ready" -ne 1 ]]; then
-        echo "e2e: /healthz not ready after ~20s; log:" >&2
+        log "e2e: /healthz not ready after ~20s; log:"
         cat "$api_log" >&2 || true
         exit 1
     fi
@@ -174,5 +186,6 @@ e2e:
     # 断言走 PublicRouter 的 PUBLIC_BODY_LIMIT_BYTES(16MiB)。
     dd if=/dev/zero of=e2e/fixtures/over-2m.bin bs=1024 count=2560 status=none
     # 单会话模型：--test 默认并行会互相吊销 access；--jobs 1 串行。
-    echo "e2e: running hurl..."
+    log "e2e: [6/6] hurl --test --jobs 1"
     hurl --test --jobs 1 --variable base_url="$base_url" e2e/*.hurl
+    log "e2e: all passed"
