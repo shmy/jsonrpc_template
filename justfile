@@ -67,7 +67,13 @@ migration-reset:
     set -a && [ -f .env ] && source .env
     : "${DATABASE_URL:?DATABASE_URL required}"
     # dialoguer needs a TTY; allocate a PTY and answer yes.
-    printf 'y\n' | script -q /dev/null cargo run --bin migrator -- migration reset
+    # util-linux `script` needs -c 'cmd' (else cargo's --bin is parsed as script opts);
+    # BSD/macOS takes the command as trailing args. Linux -e propagates cargo exit status.
+    if [[ "$(uname -s)" == Linux ]]; then
+        printf 'y\n' | script -q -e -c "cargo run --bin migrator -- migration reset" /dev/null
+    else
+        printf 'y\n' | script -q /dev/null cargo run --bin migrator -- migration reset
+    fi
 
 # Self-contained: migration-reset → ephemeral api (MASTER=true → seed admin) → hurl.
 # Needs hurl + DATABASE_URL + Redis (CACHE_REDIS_URL) + JWT_SECRET (≥32 bytes).
