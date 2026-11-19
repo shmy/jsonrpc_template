@@ -84,10 +84,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.100.0
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
-      - name: Install hurl
-        run: |
-          # hurl 仅以 deb 形式分发；升级时同步更新此 URL（https://github.com/Orange-OpenSource/hurl/releases）
-          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/Orange-OpenSource/hurl/releases/download/6.1.1/hurl_6.1.1_amd64.deb -o hurl.deb
-          sudo dpkg -i hurl.deb
+      - uses: gacts/install-hurl@v1
+        with:
+          # 升级时同步改 version（https://github.com/Orange-OpenSource/hurl/releases）
+          version: 8.1.0
       - name: e2e
         run: just e2e

@@ -1,5 +1,9 @@
 //! Domain error mappers: feature crates register at `module()` time so Dynamic
 //! `Report` can become a stable `-320xx` [`ErrorObject`].
+//!
+//! Lookup consults [`PENDING`] until [`seal_domain_mappers`] moves it into
+//! [`SEALED`]. First dispatch must **not** seal — otherwise same-process unit
+//! tests that dispatch before registering a fixture mapper panic.
 
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -9,7 +13,7 @@ use crate::ErrorObject;
 /// mapper does not own the error (another mapper or `-32603` will handle it).
 pub type DomainReportMapper = fn(&rootcause::Report) -> Option<ErrorObject>;
 
-/// `Some` until first seal; `None` after [`mappers`] takes ownership into [`SEALED`].
+/// `Some` until [`seal_domain_mappers`]; `None` after ownership moves into [`SEALED`].
 static PENDING: Mutex<Option<Vec<DomainReportMapper>>> = Mutex::new(Some(Vec::new()));
 static SEALED: OnceLock<Vec<DomainReportMapper>> = OnceLock::new();
 
@@ -35,20 +39,28 @@ pub fn register_domain_mapper(mapper: DomainReportMapper) {
 
 /// Seal the mapper list (idempotent). Call from the app shell before serving traffic.
 pub fn seal_domain_mappers() {
-    let _ = mappers();
+    let _ = SEALED.get_or_init(|| pending_lock().take().unwrap_or_default());
 }
 
-fn mappers() -> &'static [DomainReportMapper] {
-    SEALED
-        .get_or_init(|| pending_lock().take().unwrap_or_default())
-        .as_slice()
-}
-
-pub(crate) fn try_domain_mappers(report: &rootcause::Report) -> Option<ErrorObject> {
-    for mapper in mappers() {
+fn invoke(mappers: &[DomainReportMapper], report: &rootcause::Report) -> Option<ErrorObject> {
+    for mapper in mappers {
         if let Some(err) = mapper(report) {
             return Some(err);
         }
     }
     None
+}
+
+pub(crate) fn try_domain_mappers(report: &rootcause::Report) -> Option<ErrorObject> {
+    if let Some(sealed) = SEALED.get() {
+        return invoke(sealed, report);
+    }
+
+    let guard = pending_lock();
+    if let Some(pending) = guard.as_ref() {
+        return invoke(pending, report);
+    }
+    // Concurrent seal took PENDING; SEALED is (or soon will be) ready.
+    drop(guard);
+    invoke(SEALED.get().map(Vec::as_slice).unwrap_or(&[]), report)
 }
