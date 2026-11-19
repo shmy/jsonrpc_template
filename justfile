@@ -73,8 +73,13 @@ migration-reset:
     fi
     echo "migration-reset: DROP SCHEMA public CASCADE..."
     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+    migrator="${CARGO_TARGET_DIR:-target}/debug/migrator"
+    if [[ ! -x "$migrator" ]]; then
+        echo "migration-reset: building migrator..."
+        cargo build --bin migrator
+    fi
     echo "migration-reset: applying migrations..."
-    cargo run --bin migrator -- migration apply
+    "$migrator" migration apply
     echo "migration-reset: done"
 
 # Self-contained: migration-reset → ephemeral api (MASTER=true → seed admin) → hurl.
@@ -98,6 +103,8 @@ e2e:
     # 关 otlp 加快启动；blob-fs 仍需显式打开。
     # BLOB_FS_PRESIGN_SECRET：与 JWT 分离的本地预签名密钥（无 .env 时给固定测试值）。
     # 固定 Redis DB 14；启动前清该库，避免 login IP 窗连坐。
+    # 注意：Ubuntu openbsd-nc 默认会在 EOF 后一直等对端关连接 → CI 无 redis-cli 时会挂死；
+    # 必须 -N/-w，或直接装 redis-tools。
     if command -v redis-cli >/dev/null; then
       redis-cli -n 14 FLUSHDB >/dev/null || true
     else
@@ -105,8 +112,7 @@ e2e:
       {
         printf '*2\r\n$6\r\nSELECT\r\n$2\r\n14\r\n'
         printf '*1\r\n$8\r\nFLUSHDB\r\n'
-        sleep 0.1
-      } | nc 127.0.0.1 6379 >/dev/null || true
+      } | nc -N -w 2 127.0.0.1 6379 >/dev/null || true
     fi
     # 先前台 build（CI 无 TTY 时后台 cargo run 会全缓冲且编译远超 healthz 等待窗），
     # 再跑 debug 二进制，避免 wait 卡在还在编译的 cargo 上十几分钟无日志。
