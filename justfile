@@ -60,20 +60,22 @@ migration-apply:
     set -a && [ -f .env ] && source .env
     cargo run --bin migrator -- migration apply
 
-# Drop all tables and re-apply migrations (`migrator migration reset`; auto-confirm).
+# Drop all tables and re-apply migrations（非交互：psql DROP SCHEMA + apply）。
+# 不用 toasty `migration reset`：其 dialoguer Confirm 要 TTY，script/pty 伪终端在 CI 易挂死。
 migration-reset:
     #!/usr/bin/env bash
     set -euo pipefail
     set -a && [ -f .env ] && source .env
     : "${DATABASE_URL:?DATABASE_URL required}"
-    # dialoguer needs a TTY; allocate a PTY and answer yes.
-    # util-linux `script` needs -c 'cmd' (else cargo's --bin is parsed as script opts);
-    # BSD/macOS takes the command as trailing args. Linux -e propagates cargo exit status.
-    if [[ "$(uname -s)" == Linux ]]; then
-        printf 'y\n' | script -q -e -c "cargo run --bin migrator -- migration reset" /dev/null
-    else
-        printf 'y\n' | script -q /dev/null cargo run --bin migrator -- migration reset
+    if ! command -v psql >/dev/null; then
+        echo "migration-reset needs psql on PATH (CI: postgresql-client; macOS: brew install libpq && brew link --force libpq)" >&2
+        exit 1
     fi
+    echo "migration-reset: DROP SCHEMA public CASCADE..."
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+    echo "migration-reset: applying migrations..."
+    cargo run --bin migrator -- migration apply
+    echo "migration-reset: done"
 
 # Self-contained: migration-reset → ephemeral api (MASTER=true → seed admin) → hurl.
 # Needs hurl + DATABASE_URL + Redis (CACHE_REDIS_URL) + JWT_SECRET (≥32 bytes).

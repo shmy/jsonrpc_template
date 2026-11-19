@@ -86,18 +86,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.100.0
       - uses: Swatinem/rust-cache@v2
       - uses: extractions/setup-just@v2
-      - name: Install hurl
+      - name: Install hurl + psql
         run: |
-          # 升级时同步改 VERSION（https://github.com/Orange-OpenSource/hurl/releases）
+          # hurl：官方 deb（https://hurl.dev/docs/installation.html）；升级时改 VERSION
           VERSION=8.1.0
           curl --proto '=https' --tlsv1.2 -fsSL \
             --location --remote-name \
             "https://github.com/Orange-OpenSource/hurl/releases/download/${VERSION}/hurl_${VERSION}_amd64.deb"
           sudo apt-get update
-          sudo apt-get install -y "./hurl_${VERSION}_amd64.deb"
+          # psql：just migration-reset 非交互清库（不用 toasty dialoguer）
+          sudo apt-get install -y "./hurl_${VERSION}_amd64.deb" postgresql-client
           hurl --version
+          psql --version
       - name: Build e2e binaries
-        # 与 just e2e 同 features；单独 step 让编译日志不被挤在 e2e 里
+        # 与 just e2e 同 features；单独 step 让编译日志可见
         run: |
           cargo build --bin migrator
           cargo build -p api --no-default-features --features blob-fs
