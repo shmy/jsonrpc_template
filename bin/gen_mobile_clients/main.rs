@@ -1,4 +1,4 @@
-//! Generate Swift / Kotlin / Dart JSON-RPC clients from an OpenRPC JSON file.
+//! Generate Swift / Kotlin / Dart / TypeScript JSON-RPC clients from OpenRPC JSON.
 //!
 //! 默认读 `.clients/openrpc.json`（由 `just gen-clients` 拉取），不碰业务 crate。
 //!
@@ -13,6 +13,7 @@ mod emit;
 mod kotlin;
 mod model;
 mod swift;
+mod typescript;
 
 use clap::Parser;
 use serde_json::Value;
@@ -23,7 +24,7 @@ use std::process::ExitCode;
 #[derive(Debug, Parser)]
 #[command(
     name = "gen_mobile_clients",
-    about = "Generate Swift / Kotlin / Dart clients from OpenRPC JSON"
+    about = "Generate Swift / Kotlin / Dart / TypeScript clients from OpenRPC JSON"
 )]
 struct Args {
     /// OpenRPC JSON（默认：`<out>/openrpc.json`）
@@ -70,7 +71,7 @@ just gen-clients
 cargo run -p gen_mobile_clients
 ```
 
-`just gen-clients`：`curl` → `.clients/openrpc.json` → Swift / Kotlin / Dart（目录已 gitignore）。
+`just gen-clients`：`curl` → `.clients/openrpc.json` → Swift / Kotlin / Dart / TypeScript（目录已 gitignore）。
 
 ## 产物
 
@@ -80,6 +81,7 @@ cargo run -p gen_mobile_clients
 | `swift/JsonRpcClient.swift` | `URLSession` + `Codable` |
 | `kotlin/JsonRpcClient.kt` | `HttpURLConnection` + kotlinx.serialization |
 | `dart/json_rpc_client.dart` | `package:http` + `dart:convert` |
+| `typescript/jsonRpcClient.ts` | 原生 `fetch`，零依赖 |
 
 默认 endpoint：`{server}`
 
@@ -109,11 +111,22 @@ final tokens = await client.identityAccountLogin(
 client.accessToken = tokens.access_token;
 ```
 
+```ts
+import {{ JsonRpcClient }} from "./typescript/jsonRpcClient";
+
+const client = new JsonRpcClient();
+const tokens = await client.identityAccountLogin({{
+  password: "admin123!",
+  phone: "13888888888",
+}});
+client.accessToken = tokens.access_token;
+```
+
 ## 注意
 
 - `x-auth: required` 缺 `accessToken` 时本地抛错。
 - update avatar 三态（省略 / null / 字符串）未建模 omit。
-- Kotlin：`kotlinx-serialization-json`；Dart：`http: ^1.2.0`。
+- Kotlin：`kotlinx-serialization-json`；Dart：`http: ^1.2.0`；TypeScript：需运行时 `fetch`（浏览器 / Node 18+）。
 "#
     )
 }
@@ -131,17 +144,18 @@ fn run() -> Result<(), String> {
     })?;
     let ir = model::parse_document(&doc)?;
 
-    let outputs: [(&str, String); 4] = [
+    let outputs = [
         ("swift/JsonRpcClient.swift", swift::generate(&ir)),
         ("kotlin/JsonRpcClient.kt", kotlin::generate(&ir)),
         ("dart/json_rpc_client.dart", dart::generate(&ir)),
+        ("typescript/jsonRpcClient.ts", typescript::generate(&ir)),
         ("README.md", readme(&ir.server)),
     ];
 
     println!("document {}", rel(&document, &root));
-    for (rel_path, contents) in &outputs {
+    for (rel_path, contents) in outputs {
         let path = out.join(rel_path);
-        write_file(&path, contents)?;
+        write_file(&path, &contents)?;
         println!("wrote {}", rel(&path, &root));
     }
     println!(

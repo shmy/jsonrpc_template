@@ -24,7 +24,7 @@ check-fast crate="identity":
 layering:
     python3 scripts/check_layering.py
 
-# 拉取 /openrpc.json → .clients/（文档 + Swift/Kotlin/Dart；api 需在听；已有缓存可只跑后半段）
+# 拉取 /openrpc.json → .clients/（Swift/Kotlin/Dart/TS；api 需在听；已有缓存可只跑后半段）
 gen-clients url="http://127.0.0.1:9000/openrpc.json":
     #!/usr/bin/env bash
     set -euo pipefail
