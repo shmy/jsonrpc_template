@@ -81,8 +81,7 @@ pub fn generate(ir: &Ir) -> String {
     );
     o.blank();
     w!(o, "import 'dart:convert';");
-    o.blank();
-    w!(o, "import 'package:http/http.dart' as http;");
+    w!(o, "import 'dart:io';");
     o.blank();
 
     each_model(&mut o, &ir.models, DocStyle::TripleSlash, |o, model| {
@@ -130,7 +129,7 @@ pub fn generate(ir: &Ir) -> String {
         w!(o, "}}");
     });
 
-    o.line(RUNTIME.trim_end());
+    o.line(include_str!("templates/dart/runtime.inc").trim_end());
     o.blank();
 
     w!(o, "class JsonRpcClient {{");
@@ -138,15 +137,15 @@ pub fn generate(ir: &Ir) -> String {
     w!(o, "    this.endpoint = '{}',", ir.server);
     w!(o, "    this.accessToken,");
     w!(o, "    this.acceptLanguage,");
-    w!(o, "    http.Client? httpClient,");
-    w!(o, "  }}) : _http = httpClient ?? http.Client();");
+    w!(o, "    HttpClient? httpClient,");
+    w!(o, "  }}) : _http = httpClient ?? HttpClient();");
     o.blank();
     w!(o, "  String endpoint;");
     w!(o, "  String? accessToken;");
     w!(o, "  String? acceptLanguage;");
-    w!(o, "  final http.Client _http;");
+    w!(o, "  final HttpClient _http;");
     o.blank();
-    o.line(CLIENT_CORE.trim_end());
+    o.line(include_str!("templates/dart/client_core.inc").trim_end());
     o.blank();
 
     each_method(&mut o, &ir.methods, DocStyle::TripleSlash, "  ", |o, m| {
@@ -191,78 +190,8 @@ pub fn generate(ir: &Ir) -> String {
         w!(o, "  }}");
     });
 
-    w!(o, "  void close() => _http.close();");
+    w!(o, "  void close() => _http.close(force: true);");
     w!(o, "}}");
     o.blank();
     o.into_string()
 }
-
-const RUNTIME: &str = r#"
-class JsonRpcError implements Exception {
-  JsonRpcError({required this.code, required this.message, this.data});
-  final int code;
-  final String message;
-  final dynamic data;
-
-  factory JsonRpcError.fromJson(Map<String, dynamic> json) => JsonRpcError(
-        code: json['code'] as int,
-        message: json['message'] as String,
-        data: json['data'],
-      );
-
-  @override
-  String toString() => 'JsonRpcError($code): $message';
-}
-
-class JsonRpcHttpException implements Exception {
-  JsonRpcHttpException(this.status, this.body);
-  final int status;
-  final String body;
-  @override
-  String toString() => 'JsonRpcHttpException($status): $body';
-}
-
-class JsonRpcAuthRequiredException implements Exception {
-  JsonRpcAuthRequiredException(this.method);
-  final String method;
-  @override
-  String toString() => 'JsonRpcAuthRequiredException: $method';
-}
-"#;
-
-const CLIENT_CORE: &str = r#"
-  Future<dynamic> _post({
-    required String method,
-    Map<String, dynamic>? params,
-    required bool requiresAuth,
-  }) async {
-    if (requiresAuth && (accessToken == null || accessToken!.isEmpty)) {
-      throw JsonRpcAuthRequiredException(method);
-    }
-    final payload = <String, dynamic>{
-      'jsonrpc': '2.0',
-      'id': DateTime.now().microsecondsSinceEpoch.toString(),
-      'method': method,
-      if (params != null) 'params': params,
-    };
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (acceptLanguage != null) 'Accept-Language': acceptLanguage!,
-      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
-    };
-    final response = await _http.post(
-      Uri.parse(endpoint),
-      headers: headers,
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw JsonRpcHttpException(response.statusCode, response.body);
-    }
-    final root = jsonDecode(response.body) as Map<String, dynamic>;
-    final error = root['error'];
-    if (error != null) {
-      throw JsonRpcError.fromJson(error as Map<String, dynamic>);
-    }
-    return root['result'];
-  }
-"#;

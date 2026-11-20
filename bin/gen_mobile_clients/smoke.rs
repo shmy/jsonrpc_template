@@ -1,91 +1,86 @@
-//! 各语言 login 冒烟脚手架（模板在 `templates/`；`.clients` gitignore，清目录后靠生成补回）。
+//! 冒烟脚手架：`templates/` 下的原文 + 统一占位符替换后写出到 `.clients/`。
 
-type Out = (&'static str, String);
+const SEED_PHONE: &str = "13888888888";
+const SEED_PASSWORD: &str = "admin123!";
 
-pub fn outputs(server: &str) -> Vec<Out> {
-    let mut out = Vec::with_capacity(16);
-    out.extend(swift(server));
-    out.extend(dart(server));
-    out.extend(typescript(server));
-    out.extend(kotlin(server));
-    out
+struct File {
+    path: &'static str,
+    body: &'static str,
 }
 
-fn copy(path: &'static str, body: &str) -> Out {
-    (path, body.to_string())
+/// 各语言冒烟入口 / README / 构建元数据（不含 OpenRPC 生成的客户端本体）。
+const FILES: &[File] = &[
+    File {
+        path: "swift/main.swift",
+        body: include_str!("templates/swift/main.swift"),
+    },
+    File {
+        path: "swift/README.md",
+        body: include_str!("templates/swift/README.md"),
+    },
+    File {
+        path: "swift/.gitignore",
+        body: include_str!("templates/swift/.gitignore"),
+    },
+    File {
+        path: "dart/main.dart",
+        body: include_str!("templates/dart/main.dart"),
+    },
+    File {
+        path: "dart/pubspec.yaml",
+        body: include_str!("templates/dart/pubspec.yaml"),
+    },
+    File {
+        path: "dart/README.md",
+        body: include_str!("templates/dart/README.md"),
+    },
+    File {
+        path: "dart/.gitignore",
+        body: include_str!("templates/dart/.gitignore"),
+    },
+    File {
+        path: "typescript/main.ts",
+        body: include_str!("templates/typescript/main.ts"),
+    },
+    File {
+        path: "typescript/README.md",
+        body: include_str!("templates/typescript/README.md"),
+    },
+    File {
+        path: "kotlin/Main.kt",
+        body: include_str!("templates/kotlin/Main.kt"),
+    },
+    File {
+        path: "kotlin/build.gradle.kts",
+        body: include_str!("templates/kotlin/build.gradle.kts"),
+    },
+    File {
+        path: "kotlin/settings.gradle.kts",
+        body: include_str!("templates/kotlin/settings.gradle.kts"),
+    },
+    File {
+        path: "kotlin/README.md",
+        body: include_str!("templates/kotlin/README.md"),
+    },
+    File {
+        path: "kotlin/.gitignore",
+        body: include_str!("templates/kotlin/.gitignore"),
+    },
+];
+
+pub fn root_readme(server: &str) -> String {
+    render(include_str!("templates/README.md"), server)
 }
 
-fn with_server(path: &'static str, body: &str, server: &str) -> Out {
-    (path, body.replace("__SERVER__", server))
+pub fn outputs(server: &str) -> Vec<(&'static str, String)> {
+    FILES
+        .iter()
+        .map(|f| (f.path, render(f.body, server)))
+        .collect()
 }
 
-fn swift(server: &str) -> [Out; 3] {
-    [
-        copy(
-            "swift/main.swift",
-            include_str!("templates/swift/main.swift"),
-        ),
-        with_server(
-            "swift/README.md",
-            include_str!("templates/swift/README.md"),
-            server,
-        ),
-        copy(
-            "swift/.gitignore",
-            include_str!("templates/swift/.gitignore"),
-        ),
-    ]
-}
-
-fn dart(server: &str) -> [Out; 4] {
-    [
-        copy("dart/main.dart", include_str!("templates/dart/main.dart")),
-        copy(
-            "dart/pubspec.yaml",
-            include_str!("templates/dart/pubspec.yaml"),
-        ),
-        with_server(
-            "dart/README.md",
-            include_str!("templates/dart/README.md"),
-            server,
-        ),
-        copy("dart/.gitignore", include_str!("templates/dart/.gitignore")),
-    ]
-}
-
-fn typescript(server: &str) -> [Out; 2] {
-    [
-        copy(
-            "typescript/main.ts",
-            include_str!("templates/typescript/main.ts"),
-        ),
-        with_server(
-            "typescript/README.md",
-            include_str!("templates/typescript/README.md"),
-            server,
-        ),
-    ]
-}
-
-fn kotlin(server: &str) -> [Out; 5] {
-    [
-        copy("kotlin/Main.kt", include_str!("templates/kotlin/Main.kt")),
-        copy(
-            "kotlin/build.gradle.kts",
-            include_str!("templates/kotlin/build.gradle.kts"),
-        ),
-        copy(
-            "kotlin/settings.gradle.kts",
-            include_str!("templates/kotlin/settings.gradle.kts"),
-        ),
-        with_server(
-            "kotlin/README.md",
-            include_str!("templates/kotlin/README.md"),
-            server,
-        ),
-        copy(
-            "kotlin/.gitignore",
-            include_str!("templates/kotlin/.gitignore"),
-        ),
-    ]
+fn render(body: &str, server: &str) -> String {
+    body.replace("__SERVER__", server)
+        .replace("__SEED_PHONE__", SEED_PHONE)
+        .replace("__SEED_PASSWORD__", SEED_PASSWORD)
 }

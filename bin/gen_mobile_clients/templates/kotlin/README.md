@@ -8,7 +8,7 @@
 
 - JDK（17+；工程把字节码钉在 17，避免 JDK 25 与 Kotlin target 冲突）
 - Gradle（`brew install gradle` 或本机已有）
-- api 在听（seed：`13888888888` / `admin123!`）
+- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟
 

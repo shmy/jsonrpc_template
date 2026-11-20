@@ -7,7 +7,7 @@
 ## 前置
 
 - bun，或 Node ≥ 18（建议 22+，可用 `--experimental-strip-types`）
-- api 在听（seed：`13888888888` / `admin123!`）
+- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟
 
