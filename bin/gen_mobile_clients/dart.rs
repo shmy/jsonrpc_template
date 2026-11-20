@@ -80,6 +80,7 @@ pub fn generate(ir: &Ir) -> String {
         "// ignore_for_file: non_constant_identifier_names, unintended_html_in_doc_comment"
     );
     o.blank();
+    w!(o, "import 'dart:async';");
     w!(o, "import 'dart:convert';");
     w!(o, "import 'dart:io';");
     o.blank();
@@ -136,12 +137,14 @@ pub fn generate(ir: &Ir) -> String {
     w!(o, "  JsonRpcClient({{");
     w!(o, "    this.endpoint = '{}',", ir.server);
     w!(o, "    this.accessToken,");
+    w!(o, "    this.refreshToken,");
     w!(o, "    this.acceptLanguage,");
     w!(o, "    HttpClient? httpClient,");
     w!(o, "  }}) : _http = httpClient ?? HttpClient();");
     o.blank();
     w!(o, "  String endpoint;");
     w!(o, "  String? accessToken;");
+    w!(o, "  String? refreshToken;");
     w!(o, "  String? acceptLanguage;");
     w!(o, "  final HttpClient _http;");
     o.blank();
@@ -165,9 +168,27 @@ pub fn generate(ir: &Ir) -> String {
         } else {
             "null"
         };
+        let is_logout = m.name == "identity.account.logout";
+        let is_refresh = m.name == "identity.account.refresh";
 
         w!(o, "  {ret} {}({sig}) async {{", m.fn_name);
         match &m.result_type {
+            Some(_) if is_refresh => {
+                w!(o, "    return refreshSession(params.refresh_token);");
+            }
+            Some(rt) if rt == "TokenResponse" => {
+                w!(
+                    o,
+                    "    final result = await _post(method: '{}', params: {params_expr}, requiresAuth: {auth});",
+                    m.name
+                );
+                w!(
+                    o,
+                    "    final tokens = TokenResponse.fromJson(result as Map<String, dynamic>);"
+                );
+                w!(o, "    applyTokens(tokens);");
+                w!(o, "    return tokens;");
+            }
             Some(rt) => {
                 w!(
                     o,
@@ -178,6 +199,20 @@ pub fn generate(ir: &Ir) -> String {
                     o,
                     "    return {rt}.fromJson(result as Map<String, dynamic>);"
                 );
+            }
+            None if is_logout => {
+                w!(
+                    o,
+                    "    try {{"
+                );
+                w!(
+                    o,
+                    "      await _post(method: '{}', params: {params_expr}, requiresAuth: {auth});",
+                    m.name
+                );
+                w!(o, "    }} finally {{");
+                w!(o, "      clearTokens();");
+                w!(o, "    }}");
             }
             None => {
                 w!(

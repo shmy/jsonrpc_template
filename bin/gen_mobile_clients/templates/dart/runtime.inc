@@ -10,6 +10,12 @@ class JsonRpcError implements Exception {
         data: json['data'],
       );
 
+  /// access 缺失 / 无效 / 已吊销（`http_auth` `-32020..-32022`）
+  bool get isAccessAuthnFailure => code == -32020 || code == -32021 || code == -32022;
+
+  /// refresh 无效或 replay（identity `-32004`）→ 需重新 login
+  bool get isRefreshInvalid => code == -32004;
+
   @override
   String toString() => 'JsonRpcError($code): $message';
 }
@@ -27,4 +33,10 @@ class JsonRpcAuthRequiredException implements Exception {
   final String method;
   @override
   String toString() => 'JsonRpcAuthRequiredException: $method';
+}
+
+/// refresh 不可用或轮换失败，本地会话已清空。
+class JsonRpcSessionExpiredException implements Exception {
+  @override
+  String toString() => 'JsonRpcSessionExpiredException';
 }

@@ -20,7 +20,7 @@ pub fn generate(ir: &Ir) -> String {
 
     banner(&mut o, ir);
     o.blank();
-    o.line(RUNTIME.trim_end());
+    o.line(include_str!("templates/typescript/runtime.inc").trim_end());
     o.blank();
 
     each_model(&mut o, &ir.models, DocStyle::Block, |o, model| {
@@ -35,6 +35,7 @@ pub fn generate(ir: &Ir) -> String {
     w!(o, "export type JsonRpcClientOptions = {{");
     w!(o, "  endpoint?: string;");
     w!(o, "  accessToken?: string | null;");
+    w!(o, "  refreshToken?: string | null;");
     w!(o, "  acceptLanguage?: string | null;");
     w!(o, "  fetch?: typeof fetch;");
     w!(o, "}};");
@@ -43,6 +44,7 @@ pub fn generate(ir: &Ir) -> String {
     w!(o, "export class JsonRpcClient {{");
     w!(o, "  endpoint: string;");
     w!(o, "  accessToken: string | null;");
+    w!(o, "  refreshToken: string | null;");
     w!(o, "  acceptLanguage: string | null;");
     w!(o, "  private readonly _fetch: typeof fetch;");
     o.blank();
@@ -53,6 +55,7 @@ pub fn generate(ir: &Ir) -> String {
         ir.server
     );
     w!(o, "    this.accessToken = options.accessToken ?? null;");
+    w!(o, "    this.refreshToken = options.refreshToken ?? null;");
     w!(
         o,
         "    this.acceptLanguage = options.acceptLanguage ?? null;"
@@ -63,7 +66,7 @@ pub fn generate(ir: &Ir) -> String {
     );
     w!(o, "  }}");
     o.blank();
-    o.line(CLIENT_CORE.trim_end());
+    o.line(include_str!("templates/typescript/client_core.inc").trim_end());
     o.blank();
 
     each_method(&mut o, &ir.methods, DocStyle::Block, "  ", |o, m| {
@@ -79,13 +82,35 @@ pub fn generate(ir: &Ir) -> String {
         } else {
             "Promise<void>".into()
         };
+        let is_logout = m.name == "identity.account.logout";
+        let is_refresh = m.name == "identity.account.refresh";
         w!(o, "  async {}({sig}): {promise} {{", m.fn_name);
-        if ret {
+        if is_refresh {
+            w!(o, "    return await this.refreshSession(params.refresh_token);");
+        } else if ret && ty == "TokenResponse" {
+            w!(
+                o,
+                "    const tokens = await this.call<{ty}>(\"{}\", {arg}, {auth});",
+                m.name
+            );
+            w!(o, "    this.applyTokens(tokens);");
+            w!(o, "    return tokens;");
+        } else if ret {
             w!(
                 o,
                 "    return await this.call<{ty}>(\"{}\", {arg}, {auth});",
                 m.name
             );
+        } else if is_logout {
+            w!(o, "    try {{");
+            w!(
+                o,
+                "      await this.call<{ty}>(\"{}\", {arg}, {auth});",
+                m.name
+            );
+            w!(o, "    }} finally {{");
+            w!(o, "      this.clearTokens();");
+            w!(o, "    }}");
         } else {
             w!(
                 o,
@@ -100,85 +125,3 @@ pub fn generate(ir: &Ir) -> String {
     o.blank();
     o.into_string()
 }
-
-const RUNTIME: &str = r#"
-export class JsonRpcError extends Error {
-  readonly code: number;
-  readonly data: unknown;
-
-  constructor(code: number, message: string, data?: unknown) {
-    super(message);
-    this.name = "JsonRpcError";
-    this.code = code;
-    this.data = data;
-  }
-}
-
-export class JsonRpcHttpError extends Error {
-  readonly status: number;
-  readonly body: string;
-
-  constructor(status: number, body: string) {
-    super(`HTTP ${status}`);
-    this.name = "JsonRpcHttpError";
-    this.status = status;
-    this.body = body;
-  }
-}
-
-export class JsonRpcAuthRequiredError extends Error {
-  readonly method: string;
-
-  constructor(method: string) {
-    super(`Bearer required for ${method}`);
-    this.name = "JsonRpcAuthRequiredError";
-    this.method = method;
-  }
-}
-"#;
-
-const CLIENT_CORE: &str = r#"
-  private async call<T>(
-    method: string,
-    params: unknown,
-    requiresAuth: boolean,
-  ): Promise<T> {
-    if (requiresAuth && (this.accessToken == null || this.accessToken === "")) {
-      throw new JsonRpcAuthRequiredError(method);
-    }
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (this.acceptLanguage != null) {
-      headers["Accept-Language"] = this.acceptLanguage;
-    }
-    if (this.accessToken != null) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
-    }
-    const payload: Record<string, unknown> = {
-      jsonrpc: "2.0",
-      id: crypto.randomUUID(),
-      method,
-    };
-    if (params !== undefined) {
-      payload.params = params;
-    }
-    const response = await this._fetch(this.endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    const bodyText = await response.text();
-    if (!response.ok) {
-      throw new JsonRpcHttpError(response.status, bodyText);
-    }
-    const root = JSON.parse(bodyText) as {
-      result?: T;
-      error?: { code: number; message: string; data?: unknown };
-    };
-    if (root.error != null) {
-      throw new JsonRpcError(root.error.code, root.error.message, root.error.data);
-    }
-    return root.result as T;
-  }
-"#;

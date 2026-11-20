@@ -43,6 +43,10 @@ const FILES: &[File] = &[
         body: include_str!("templates/typescript/main.ts"),
     },
     File {
+        path: "typescript/session.test.ts",
+        body: include_str!("templates/typescript/session.test.ts"),
+    },
+    File {
         path: "typescript/README.md",
         body: include_str!("templates/typescript/README.md"),
     },

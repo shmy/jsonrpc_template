@@ -16,6 +16,9 @@ mod smoke;
 mod swift;
 mod typescript;
 
+#[cfg(test)]
+mod session_invariants;
+
 use clap::Parser;
 use serde_json::Value;
 use std::fs;
