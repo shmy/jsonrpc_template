@@ -12,6 +12,7 @@ mod dart;
 mod emit;
 mod kotlin;
 mod model;
+mod smoke;
 mod swift;
 mod typescript;
 
@@ -62,71 +63,34 @@ fn readme(server: &str) -> String {
     format!(
         r#"# Generated mobile JSON-RPC clients
 
-由 `gen_mobile_clients` 从 OpenRPC JSON 生成（业务 crate 无改动）。
+由 `gen_mobile_clients` 从 OpenRPC JSON 生成（业务 crate 无改动）。目录已 gitignore。
 
 ## 重新生成
 
 ```bash
-just gen-clients
-cargo run -p gen_mobile_clients
+just gen-clients                 # curl openrpc → 生成（api 需在听，或用缓存）
+cargo run -p gen_mobile_clients  # 仅生成（需已有 .clients/openrpc.json）
 ```
-
-`just gen-clients`：`curl` → `.clients/openrpc.json` → Swift / Kotlin / Dart / TypeScript（目录已 gitignore）。
 
 ## 产物
 
-| 文件 | 说明 |
+| 路径 | 说明 |
 |------|------|
 | `openrpc.json` | OpenRPC 文档 |
 | `swift/JsonRpcClient.swift` | `URLSession` + `Codable` |
 | `kotlin/JsonRpcClient.kt` | `HttpURLConnection` + kotlinx.serialization |
-| `dart/json_rpc_client.dart` | `package:http` + `dart:convert` |
-| `typescript/jsonRpcClient.ts` | 原生 `fetch`，零依赖 |
+| `dart/json_rpc_client.dart` | `package:http` |
+| `typescript/jsonRpcClient.ts` | 原生 `fetch` |
+| `swift/` `dart/` `typescript/` `kotlin/` | 各语言 README + login 冒烟 |
 
-默认 endpoint：`{server}`
-
-## 用法
-
-```swift
-let client = JsonRpcClient()
-let tokens = try await client.identityAccountLogin(
-  IdentityAccountLoginParams(password: "admin123!", phone: "13888888888")
-)
-client.accessToken = tokens.access_token
-```
-
-```kotlin
-val client = JsonRpcClient()
-val tokens = client.identityAccountLogin(
-  IdentityAccountLoginParams(password = "admin123!", phone = "13888888888")
-)
-client.accessToken = tokens.access_token
-```
-
-```dart
-final client = JsonRpcClient();
-final tokens = await client.identityAccountLogin(
-  IdentityAccountLoginParams(password: 'admin123!', phone: '13888888888'),
-);
-client.accessToken = tokens.access_token;
-```
-
-```ts
-import {{ JsonRpcClient }} from "./typescript/jsonRpcClient";
-
-const client = new JsonRpcClient();
-const tokens = await client.identityAccountLogin({{
-  password: "admin123!",
-  phone: "13888888888",
-}});
-client.accessToken = tokens.access_token;
-```
+默认 endpoint：`{server}`  
+Seed：`13888888888` / `admin123!`（见各子目录 `README.md`）。
 
 ## 注意
 
 - `x-auth: required` 缺 `accessToken` 时本地抛错。
 - update avatar 三态（省略 / null / 字符串）未建模 omit。
-- Kotlin：`kotlinx-serialization-json`；Dart：`http: ^1.2.0`；TypeScript：需运行时 `fetch`（浏览器 / Node 18+）。
+- 冒烟脚手架在 `bin/gen_mobile_clients/templates/`；清 `.clients` 后重新生成即可补回。
 "#
     )
 }
@@ -144,13 +108,14 @@ fn run() -> Result<(), String> {
     })?;
     let ir = model::parse_document(&doc)?;
 
-    let outputs = [
+    let mut outputs = vec![
         ("swift/JsonRpcClient.swift", swift::generate(&ir)),
         ("kotlin/JsonRpcClient.kt", kotlin::generate(&ir)),
         ("dart/json_rpc_client.dart", dart::generate(&ir)),
         ("typescript/jsonRpcClient.ts", typescript::generate(&ir)),
         ("README.md", readme(&ir.server)),
     ];
+    outputs.extend(smoke::outputs(&ir.server));
 
     println!("document {}", rel(&document, &root));
     for (rel_path, contents) in outputs {

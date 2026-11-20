@@ -103,7 +103,8 @@ impl LangTypes {
             "integer" => ("Int64", "Long", "int", "number"),
             "number" => ("Double", "Double", "double", "number"),
             "boolean" => ("Bool", "Boolean", "bool", "boolean"),
-            "null" => ("JsonRpcNull", "JsonRpcNull", "Null", "null"),
+            // bare `type: null`（method result null 已升成 void）
+            "null" => ("JsonRpcValue", "JsonRpcValue", "Null", "null"),
             "object" => (
                 "[String: JsonRpcValue]",
                 "Map<String, JsonRpcValue>",

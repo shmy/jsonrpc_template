@@ -113,8 +113,6 @@ pub fn generate(ir: &Ir) -> String {
 }
 
 const RUNTIME: &str = r#"
-public enum JsonRpcNull: Codable, Sendable {}
-
 public enum JsonRpcValue: Codable, Sendable {
     case null
     case bool(Bool)
