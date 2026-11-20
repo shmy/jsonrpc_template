@@ -86,7 +86,10 @@ pub fn generate(ir: &Ir) -> String {
         let is_refresh = m.name == "identity.account.refresh";
         w!(o, "  async {}({sig}): {promise} {{", m.fn_name);
         if is_refresh {
-            w!(o, "    return await this.refreshSession(params.refresh_token);");
+            w!(
+                o,
+                "    return await this.refreshSession(params.refresh_token);"
+            );
         } else if ret && ty == "TokenResponse" {
             w!(
                 o,

@@ -4,31 +4,20 @@
   Future<TokenResponse>? _refreshInFlight;
   int _sessionEpoch = 0;
 
-  void Function(String? accessToken, String? refreshToken)? onTokensChanged;
-  void Function()? onSessionExpired;
-
   void applyTokens(TokenResponse tokens) {
     accessToken = tokens.access_token;
     refreshToken = tokens.refresh_token;
-    onTokensChanged?.call(accessToken, refreshToken);
   }
 
-  void clearTokens({bool sessionExpired = false}) {
+  void clearTokens() {
     _sessionEpoch += 1;
     accessToken = null;
     refreshToken = null;
-    onTokensChanged?.call(null, null);
-    if (sessionExpired) {
-      onSessionExpired?.call();
-    }
   }
 
-  /// 公开 refresh：若已有单飞则加入；否则用 [refresh] 发起一轮。
   Future<TokenResponse> refreshSession(String refresh) {
     final inflight = _refreshInFlight;
-    if (inflight != null) {
-      return inflight;
-    }
+    if (inflight != null) return inflight;
     refreshToken = refresh;
     return _refreshSingleFlight();
   }
@@ -50,10 +39,7 @@
         bearer: usedAccess,
       );
     } on JsonRpcError catch (err) {
-      if (!requiresAuth || !err.isAccessAuthnFailure) {
-        rethrow;
-      }
-      // 他人已轮换：直接用新 access 重试，勿二次 rotate
+      if (!requiresAuth || !err.isAccessAuthnFailure) rethrow;
       if (accessToken != null &&
           accessToken!.isNotEmpty &&
           accessToken != usedAccess) {
@@ -75,9 +61,7 @@
   }
 
   Future<void> _ensureAccessToken(String method) async {
-    if (accessToken != null && accessToken!.isNotEmpty) {
-      return;
-    }
+    if (accessToken != null && accessToken!.isNotEmpty) return;
     if (refreshToken != null && refreshToken!.isNotEmpty) {
       await _refreshSingleFlight();
       return;
@@ -100,15 +84,17 @@
           requiresAuth: requiresAuth,
           bearer: bearer,
         );
-      } on SocketException {
+      } catch (e) {
+        if (e is JsonRpcError || e is JsonRpcHttpException) rethrow;
+        if (e is! SocketException &&
+            e is! HttpException &&
+            e is! TimeoutException) {
+          rethrow;
+        }
         if (attempt >= _maxNetworkRetries) rethrow;
-      } on HttpException {
-        if (attempt >= _maxNetworkRetries) rethrow;
-      } on TimeoutException {
-        if (attempt >= _maxNetworkRetries) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 200 * (1 << attempt)));
+        attempt += 1;
       }
-      await Future<void>.delayed(Duration(milliseconds: 200 * (1 << attempt)));
-      attempt += 1;
     }
   }
 
@@ -146,9 +132,6 @@
         throw JsonRpcError.fromJson(error as Map<String, dynamic>);
       }
       return root['result'];
-    } on TimeoutException {
-      request.abort();
-      rethrow;
     } catch (e) {
       if (e is! JsonRpcError && e is! JsonRpcHttpException) {
         request.abort();
@@ -157,12 +140,9 @@
     }
   }
 
-  /// 同步占坑后再启动 I/O，避免并发双发 refresh。
   Future<TokenResponse> _refreshSingleFlight() {
     final existing = _refreshInFlight;
-    if (existing != null) {
-      return existing;
-    }
+    if (existing != null) return existing;
     final gate = Completer<TokenResponse>();
     _refreshInFlight = gate.future;
     () async {
@@ -182,7 +162,7 @@
   Future<TokenResponse> _rotateRefresh() async {
     final current = refreshToken;
     if (current == null || current.isEmpty) {
-      clearTokens(sessionExpired: true);
+      clearTokens();
       throw JsonRpcSessionExpiredException();
     }
     final epoch = _sessionEpoch;
@@ -195,17 +175,14 @@
         bearer: null,
       );
       final tokens = TokenResponse.fromJson(result as Map<String, dynamic>);
-      // 与 clearTokens 同序、无 await：epoch 未变才写入（防假登录；服务端新票成孤儿见 README）
       if (epoch != _sessionEpoch) {
         throw JsonRpcSessionExpiredException();
       }
-      accessToken = tokens.access_token;
-      refreshToken = tokens.refresh_token;
-      onTokensChanged?.call(accessToken, refreshToken);
+      applyTokens(tokens);
       return tokens;
     } on JsonRpcError catch (err) {
       if (err.isRefreshInvalid) {
-        clearTokens(sessionExpired: true);
+        clearTokens();
         throw JsonRpcSessionExpiredException();
       }
       rethrow;

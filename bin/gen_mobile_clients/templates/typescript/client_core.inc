@@ -4,30 +4,19 @@
   private refreshInFlight: Promise<TokenResponse> | null = null;
   private sessionEpoch = 0;
 
-  onTokensChanged?: (accessToken: string | null, refreshToken: string | null) => void;
-  onSessionExpired?: () => void;
-
   applyTokens(tokens: TokenResponse): void {
     this.accessToken = tokens.access_token;
     this.refreshToken = tokens.refresh_token;
-    this.onTokensChanged?.(this.accessToken, this.refreshToken);
   }
 
-  clearTokens(options: { sessionExpired?: boolean } = {}): void {
+  clearTokens(): void {
     this.sessionEpoch += 1;
     this.accessToken = null;
     this.refreshToken = null;
-    this.onTokensChanged?.(null, null);
-    if (options.sessionExpired) {
-      this.onSessionExpired?.();
-    }
   }
 
-  /** 公开 refresh：若已有单飞则加入；否则用 refresh 发起一轮。 */
   refreshSession(refresh: string): Promise<TokenResponse> {
-    if (this.refreshInFlight != null) {
-      return this.refreshInFlight;
-    }
+    if (this.refreshInFlight != null) return this.refreshInFlight;
     this.refreshToken = refresh;
     return this.refreshSingleFlight();
   }
@@ -44,10 +33,7 @@
     try {
       return await this.callWithNetworkRetry<T>(method, params, requiresAuth, usedAccess);
     } catch (err) {
-      if (!(err instanceof JsonRpcError)) {
-        throw err;
-      }
-      if (!requiresAuth || !err.isAccessAuthnFailure) {
+      if (!(err instanceof JsonRpcError) || !requiresAuth || !err.isAccessAuthnFailure) {
         throw err;
       }
       if (
@@ -73,9 +59,7 @@
   }
 
   private async ensureAccessToken(method: string): Promise<void> {
-    if (this.accessToken != null && this.accessToken !== "") {
-      return;
-    }
+    if (this.accessToken != null && this.accessToken !== "") return;
     if (this.refreshToken != null && this.refreshToken !== "") {
       await this.refreshSingleFlight();
       return;
@@ -162,11 +146,8 @@
     return root.result as T;
   }
 
-  /** 同步占坑后再启动 I/O，避免并发双发 refresh。 */
   private refreshSingleFlight(): Promise<TokenResponse> {
-    if (this.refreshInFlight != null) {
-      return this.refreshInFlight;
-    }
+    if (this.refreshInFlight != null) return this.refreshInFlight;
     let resolve!: (v: TokenResponse) => void;
     let reject!: (e: unknown) => void;
     const gate = new Promise<TokenResponse>((res, rej) => {
@@ -187,7 +168,7 @@
   private async rotateRefresh(): Promise<TokenResponse> {
     const current = this.refreshToken;
     if (current == null || current === "") {
-      this.clearTokens({ sessionExpired: true });
+      this.clearTokens();
       throw new JsonRpcSessionExpiredError();
     }
     const epoch = this.sessionEpoch;
@@ -199,17 +180,14 @@
         false,
         null,
       );
-      // 与 clearTokens 同序、无 await：epoch 未变才写入（防假登录；服务端新票成孤儿见 README）
       if (epoch !== this.sessionEpoch) {
         throw new JsonRpcSessionExpiredError();
       }
-      this.accessToken = tokens.access_token;
-      this.refreshToken = tokens.refresh_token;
-      this.onTokensChanged?.(this.accessToken, this.refreshToken);
+      this.applyTokens(tokens);
       return tokens;
     } catch (err) {
       if (err instanceof JsonRpcError && err.isRefreshInvalid) {
-        this.clearTokens({ sessionExpired: true });
+        this.clearTokens();
         throw new JsonRpcSessionExpiredError();
       }
       throw err;

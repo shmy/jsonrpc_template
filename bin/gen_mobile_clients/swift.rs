@@ -89,7 +89,10 @@ pub fn generate(ir: &Ir) -> String {
                         "    public func {}({params_sig}) async throws -> {rt} {{",
                         m.fn_name
                     );
-                    w!(o, "        return try await refreshSession(refresh: params.refresh_token)");
+                    w!(
+                        o,
+                        "        return try await refreshSession(refresh: params.refresh_token)"
+                    );
                 }
                 Some(rt) if rt == "TokenResponse" => {
                     w!(

@@ -7,43 +7,23 @@
     @Volatile private var sessionEpoch = 0
     @Volatile private var refreshInFlight: java.util.concurrent.CompletableFuture<TokenResponse>? = null
 
-    @Volatile var onTokensChanged: ((String?, String?) -> Unit)? = null
-    @Volatile var onSessionExpired: (() -> Unit)? = null
-
     fun applyTokens(tokens: TokenResponse) {
         synchronized(refreshMonitor) {
             accessToken = tokens.access_token
             refreshToken = tokens.refresh_token
         }
-        onTokensChanged?.invoke(tokens.access_token, tokens.refresh_token)
     }
 
-    fun clearTokens(sessionExpired: Boolean = false) {
+    fun clearTokens() {
         synchronized(refreshMonitor) {
             sessionEpoch += 1
             accessToken = null
             refreshToken = null
         }
-        onTokensChanged?.invoke(null, null)
-        if (sessionExpired) {
-            onSessionExpired?.invoke()
-        }
     }
 
-    /** 公开 refresh：与自动 refresh 共用单飞，避免竞态。 */
-    fun refreshSession(refresh: String): TokenResponse {
-        var created: java.util.concurrent.CompletableFuture<TokenResponse>? = null
-        val future = synchronized(refreshMonitor) {
-            refreshInFlight?.let { return@synchronized it }
-            refreshToken = refresh
-            val gate = java.util.concurrent.CompletableFuture<TokenResponse>()
-            refreshInFlight = gate
-            created = gate
-            gate
-        }
-        runRefreshGate(created, future)
-        return awaitFuture(future)
-    }
+    fun refreshSession(refresh: String): TokenResponse =
+        beginRefresh(forceRefresh = refresh)!!
 
     private fun post(method: String, params: JsonElement?, requiresAuth: Boolean): JsonElement? {
         if (requiresAuth) {
@@ -53,14 +33,12 @@
         return try {
             postWithNetworkRetry(method, params, requiresAuth, usedAccess)
         } catch (err: JsonRpcClientException.Rpc) {
-            if (!requiresAuth || !err.error.isAccessAuthnFailure) {
-                throw err
-            }
+            if (!requiresAuth || !err.error.isAccessAuthnFailure) throw err
             val current = accessToken
             if (!current.isNullOrEmpty() && current != usedAccess) {
                 return postWithNetworkRetry(method, params, requiresAuth, current)
             }
-            refreshAccess(staleAccess = usedAccess)
+            beginRefresh(staleAccess = usedAccess)
             postWithNetworkRetry(method, params, requiresAuth, accessToken)
         }
     }
@@ -68,7 +46,7 @@
     private fun ensureAccessToken(method: String) {
         if (!accessToken.isNullOrEmpty()) return
         if (!refreshToken.isNullOrEmpty()) {
-            refreshAccess(staleAccess = null)
+            beginRefresh(staleAccess = null)
             return
         }
         throw JsonRpcClientException.AuthRequired(method)
@@ -115,7 +93,9 @@
                 setRequestProperty("Authorization", "Bearer $bearer")
             }
         }
-        conn.outputStream.use { it.write(json.encodeToString(JsonElement.serializer(), payload).toByteArray(StandardCharsets.UTF_8)) }
+        conn.outputStream.use {
+            it.write(json.encodeToString(JsonElement.serializer(), payload).toByteArray(StandardCharsets.UTF_8))
+        }
         val status = conn.responseCode
         val raw = (if (status in 200..299) conn.inputStream else conn.errorStream)
             ?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }
@@ -129,43 +109,44 @@
     }
 
     /**
-     * 自动 refresh：锁内复用 in-flight / 判断是否可跳过 / 登记 Future；网络在锁外。
-     * @param staleAccess 鉴权失败时的旧 access；ensure 路径传 null（只要有 refresh 就 rotate）。
+     * 锁内登记/复用 Future，网络在锁外。
+     * @return null 表示可跳过（access 已更新）；公开 [refreshSession] 不会走到跳过。
      */
-    private fun refreshAccess(staleAccess: String?) {
+    private fun beginRefresh(
+        forceRefresh: String? = null,
+        staleAccess: String? = null,
+    ): TokenResponse? {
         var created: java.util.concurrent.CompletableFuture<TokenResponse>? = null
         val future = synchronized(refreshMonitor) {
             refreshInFlight?.let { return@synchronized it }
-            val current = accessToken
-            if (!current.isNullOrEmpty() && (staleAccess == null || current != staleAccess)) {
-                return@synchronized null
+            if (forceRefresh != null) {
+                refreshToken = forceRefresh
+            } else {
+                val current = accessToken
+                if (!current.isNullOrEmpty() && (staleAccess == null || current != staleAccess)) {
+                    return@synchronized null
+                }
             }
-            val gate = java.util.concurrent.CompletableFuture<TokenResponse>()
-            refreshInFlight = gate
-            created = gate
-            gate
-        } ?: return
-        runRefreshGate(created, future)
-        awaitFuture(future)
-    }
+            java.util.concurrent.CompletableFuture<TokenResponse>().also {
+                refreshInFlight = it
+                created = it
+            }
+        } ?: return null
 
-    private fun runRefreshGate(
-        created: java.util.concurrent.CompletableFuture<TokenResponse>?,
-        future: java.util.concurrent.CompletableFuture<TokenResponse>,
-    ) {
-        if (created != null && created === future) {
+        created?.let { gate ->
             try {
-                created.complete(rotateRefresh())
+                gate.complete(rotateRefresh())
             } catch (e: Throwable) {
-                created.completeExceptionally(e)
+                gate.completeExceptionally(e)
             } finally {
                 synchronized(refreshMonitor) {
-                    if (refreshInFlight === created) {
+                    if (refreshInFlight === gate) {
                         refreshInFlight = null
                     }
                 }
             }
         }
+        return awaitFuture(future)
     }
 
     private fun <T> awaitFuture(future: java.util.concurrent.CompletableFuture<T>): T {
@@ -189,7 +170,7 @@
             Pair(refreshToken, sessionEpoch)
         }
         if (current.isNullOrEmpty()) {
-            clearTokens(sessionExpired = true)
+            clearTokens()
             throw JsonRpcClientException.SessionExpired()
         }
         try {
@@ -208,11 +189,10 @@
                 accessToken = tokens.access_token
                 refreshToken = tokens.refresh_token
             }
-            onTokensChanged?.invoke(tokens.access_token, tokens.refresh_token)
             return tokens
         } catch (err: JsonRpcClientException.Rpc) {
             if (err.error.isRefreshInvalid) {
-                clearTokens(sessionExpired = true)
+                clearTokens()
                 throw JsonRpcClientException.SessionExpired()
             }
             throw err

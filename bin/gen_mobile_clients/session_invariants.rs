@@ -102,43 +102,47 @@ fn single_flight_sync_claim() {
 fn clear_tokens_bumps_epoch() {
     for (lang, src) in CORES {
         assert!(
-            src.contains("sessionEpoch") || src.contains("_sessionEpoch"),
-            "{lang}: must track sessionEpoch"
+            src.contains("sessionEpoch")
+                || src.contains("_sessionEpoch")
+                || src.contains("epochLock"),
+            "{lang}: must track session epoch"
         );
         assert!(
-            src.contains("sessionExpired"),
-            "{lang}: clearTokens must support sessionExpired callback path"
+            src.contains("clearTokens") || src.contains("clear_tokens"),
+            "{lang}: must expose clearTokens"
+        );
+        assert!(
+            !src.contains("onTokensChanged") && !src.contains("onSessionExpired"),
+            "{lang}: must not expose token/session callbacks"
         );
     }
 }
 
 #[test]
-fn kotlin_apply_and_refresh_session_locked() {
+fn kotlin_apply_and_begin_refresh_locked() {
     let kotlin = include_str!("templates/kotlin/client_core.inc");
-    let apply = kotlin
-        .split("fun applyTokens")
-        .nth(1)
-        .expect("applyTokens")
-        .split("fun clearTokens")
-        .next()
-        .expect("apply body");
     assert!(
-        apply.contains("synchronized(refreshMonitor)"),
+        kotlin
+            .split("fun applyTokens")
+            .nth(1)
+            .and_then(|s| s.split("fun clearTokens").next())
+            .is_some_and(|apply| apply.contains("synchronized(refreshMonitor)")),
         "kotlin applyTokens must share refreshMonitor with clearTokens"
     );
-
-    let idx = kotlin.find("fun refreshSession").expect("refreshSession");
-    let body = &kotlin[idx..(idx + 450).min(kotlin.len())];
     assert!(
-        body.contains("synchronized(refreshMonitor)"),
-        "kotlin refreshSession must enter refreshMonitor"
+        kotlin.contains("beginRefresh(forceRefresh = refresh)"),
+        "kotlin refreshSession must go through beginRefresh"
     );
-    let inflight_at = body.find("refreshInFlight").expect("in-flight check");
-    let token_at = body
-        .find("refreshToken = refresh")
-        .expect("assign refreshToken");
     assert!(
-        inflight_at < token_at,
+        kotlin.split("fun beginRefresh").nth(1).is_some_and(|body| {
+            match (
+                body.find("refreshInFlight"),
+                body.find("refreshToken = forceRefresh"),
+            ) {
+                (Some(a), Some(b)) => a < b,
+                _ => false,
+            }
+        }),
         "kotlin: check in-flight before overwriting refreshToken"
     );
 }

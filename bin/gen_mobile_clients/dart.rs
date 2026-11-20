@@ -201,10 +201,7 @@ pub fn generate(ir: &Ir) -> String {
                 );
             }
             None if is_logout => {
-                w!(
-                    o,
-                    "    try {{"
-                );
+                w!(o, "    try {{");
                 w!(
                     o,
                     "      await _post(method: '{}', params: {params_expr}, requiresAuth: {auth});",

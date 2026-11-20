@@ -20,11 +20,7 @@
 
     private static let maxNetworkRetries = 2
     private let refreshCoordinator = RefreshCoordinator()
-    /// 仅存 sessionEpoch；access/refresh 仍用公开属性（便于调用方直接赋值），读写均经 withLock。
     private let epochLock = OSAllocatedUnfairLock(initialState: 0)
-
-    public var onTokensChanged: (@Sendable (String?, String?) -> Void)?
-    public var onSessionExpired: (@Sendable () -> Void)?
 
     private actor RefreshCoordinator {
         private var inFlight: Task<TokenResponse, Error>?
@@ -41,25 +37,20 @@
     }
 
     public func applyTokens(_ tokens: TokenResponse) {
-        let pair = epochLock.withLock { _ -> (String?, String?) in
+        epochLock.withLock { _ in
             accessToken = tokens.access_token
             refreshToken = tokens.refresh_token
-            return (accessToken, refreshToken)
         }
-        onTokensChanged?(pair.0, pair.1)
     }
 
-    public func clearTokens(sessionExpired: Bool = false) {
+    public func clearTokens() {
         epochLock.withLock { epoch in
             epoch += 1
             accessToken = nil
             refreshToken = nil
         }
-        onTokensChanged?(nil, nil)
-        if sessionExpired { onSessionExpired?() }
     }
 
-    /// 公开 refresh：若已有单飞则加入；否则用 refresh 发起一轮。
     public func refreshSession(refresh: String) async throws -> TokenResponse {
         try await refreshCoordinator.run { [weak self] in
             guard let self else { throw JsonRpcClientError.sessionExpired }
@@ -144,8 +135,7 @@
             } catch {
                 throw error
             }
-            let delay = UInt64(200 * (1 << attempt)) * 1_000_000
-            try await Task.sleep(nanoseconds: delay)
+            try await Task.sleep(nanoseconds: UInt64(200 * (1 << attempt)) * 1_000_000)
             attempt += 1
         }
     }
@@ -171,16 +161,22 @@
         req.httpMethod = "POST"
         req.timeoutInterval = 30
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let acceptLanguage { req.setValue(acceptLanguage, forHTTPHeaderField: "Accept-Language") }
+        if let acceptLanguage {
+            req.setValue(acceptLanguage, forHTTPHeaderField: "Accept-Language")
+        }
         if requiresAuth, let bearer, !bearer.isEmpty {
             req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
         }
-        let envelope = RequestEnvelope(id: UUID().uuidString, method: method, params: params)
-        req.httpBody = try JSONEncoder().encode(envelope)
+        req.httpBody = try JSONEncoder().encode(
+            RequestEnvelope(id: UUID().uuidString, method: method, params: params)
+        )
         let (data, response) = try await session.data(for: req)
         let status = (response as? HTTPURLResponse)?.statusCode ?? -1
         guard (200..<300).contains(status) else {
-            throw JsonRpcClientError.http(status: status, body: String(data: data, encoding: .utf8) ?? "")
+            throw JsonRpcClientError.http(
+                status: status,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
         }
         let decoded = try JSONDecoder().decode(ResponseEnvelope<R>.self, from: data)
         if let error = decoded.error { throw JsonRpcClientError.rpc(error) }
@@ -201,7 +197,7 @@
     private func rotateRefresh() async throws -> TokenResponse {
         let (current, epoch) = epochLock.withLock { epoch in (refreshToken, epoch) }
         guard let current, !current.isEmpty else {
-            clearTokens(sessionExpired: true)
+            clearTokens()
             throw JsonRpcClientError.sessionExpired
         }
         do {
@@ -213,19 +209,17 @@
                 bearer: nil,
                 as: TokenResponse.self
             )
-            let pair: (String?, String?) = try epochLock.withLock { still in
+            try epochLock.withLock { still in
                 guard epoch == still else {
                     throw JsonRpcClientError.sessionExpired
                 }
                 accessToken = tokens.access_token
                 refreshToken = tokens.refresh_token
-                return (accessToken, refreshToken)
             }
-            onTokensChanged?(pair.0, pair.1)
             return tokens
         } catch let JsonRpcClientError.rpc(err) {
             if err.isRefreshInvalid {
-                clearTokens(sessionExpired: true)
+                clearTokens()
                 throw JsonRpcClientError.sessionExpired
             }
             throw JsonRpcClientError.rpc(err)
