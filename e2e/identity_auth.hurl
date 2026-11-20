@@ -197,7 +197,7 @@ jsonpath "$.error" not exists
 access_token: jsonpath "$.result.access_token"
 
 
-# replay old refresh → -32004（并吊销当前会话）
+# replay old refresh → -32004（并吊销当前会话；e2e 以 REFRESH_GRACE_TTL=0s 跑）
 POST {{base_url}}/jsonrpc
 Content-Type: application/json
 Accept-Language: en

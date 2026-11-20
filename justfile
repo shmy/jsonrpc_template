@@ -132,10 +132,13 @@ e2e:
     log "e2e: [3/5] build + start api on $listen"
     cargo build -p api --no-default-features --features blob-fs
     : >"$api_log"
+    # REFRESH_GRACE_TTL=0：关闭宽限，保留「旧 refresh 重放 → -32004 吊销」断言；
+    # 宽限幂等路径由 identity token_ops 单测覆盖。
     MASTER=true \
     SEED_ADMIN_PHONE=13800000777 \
     SEED_ADMIN_PASSWORD=seed-pass-1 \
     DOCS_ENABLED=true \
+    REFRESH_GRACE_TTL=0s \
     RATE_LIMIT_AUTH_PER_SECOND=1000 \
     RATE_LIMIT_AUTH_BURST=2000 \
     RATE_LIMIT_LOGIN_PHONE_MAX_ATTEMPTS=1000 \
