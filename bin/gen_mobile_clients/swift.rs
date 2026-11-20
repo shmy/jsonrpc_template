@@ -1,4 +1,4 @@
-use crate::emit::{DocStyle, SourceBuf, banner, each_method, w};
+use crate::emit::{DocStyle, SourceBuf, banner, doc_comment, each_method, each_model, w};
 use crate::model::{Ir, swift_ident};
 
 pub fn generate(ir: &Ir) -> String {
@@ -10,9 +10,10 @@ pub fn generate(ir: &Ir) -> String {
     o.line(RUNTIME.trim_end());
     o.blank();
 
-    for model in &ir.models {
+    each_model(&mut o, &ir.models, DocStyle::TripleSlash, |o, model| {
         w!(o, "public struct {}: Codable, Sendable {{", model.name);
         for f in &model.fields {
+            doc_comment(o, &f.description, DocStyle::TripleSlash, "    ");
             w!(
                 o,
                 "    public var {}: {}",
@@ -34,8 +35,7 @@ pub fn generate(ir: &Ir) -> String {
         }
         w!(o, "    }}");
         w!(o, "}}");
-        o.blank();
-    }
+    });
 
     w!(
         o,

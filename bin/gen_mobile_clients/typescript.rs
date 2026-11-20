@@ -1,4 +1,4 @@
-use crate::emit::{DocStyle, SourceBuf, banner, each_method, w};
+use crate::emit::{DocStyle, SourceBuf, banner, doc_comment, each_method, each_model, w};
 use crate::model::Ir;
 
 /// Property name in TS interfaces; quote when not a simple identifier.
@@ -23,14 +23,14 @@ pub fn generate(ir: &Ir) -> String {
     o.line(RUNTIME.trim_end());
     o.blank();
 
-    for model in &ir.models {
+    each_model(&mut o, &ir.models, DocStyle::Block, |o, model| {
         w!(o, "export interface {} {{", model.name);
         for f in &model.fields {
+            doc_comment(o, &f.description, DocStyle::Block, "  ");
             w!(o, "  {}: {};", ts_prop(&f.name), f.ts_type);
         }
         w!(o, "}}");
-        o.blank();
-    }
+    });
 
     w!(o, "export type JsonRpcClientOptions = {{");
     w!(o, "  endpoint?: string;");

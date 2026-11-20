@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Field {
     pub name: String,
     pub optional: bool,
+    pub description: String,
     pub swift_type: String,
     pub kotlin_type: String,
     pub dart_type: String,
@@ -14,10 +15,16 @@ pub struct Field {
 }
 
 impl Field {
-    fn from_lang(name: impl Into<String>, optional: bool, t: LangTypes) -> Self {
+    fn from_lang(
+        name: impl Into<String>,
+        optional: bool,
+        t: LangTypes,
+        description: impl Into<String>,
+    ) -> Self {
         Self {
             name: name.into(),
             optional,
+            description: description.into(),
             swift_type: t.swift,
             kotlin_type: t.kotlin,
             dart_type: t.dart,
@@ -29,7 +36,18 @@ impl Field {
 #[derive(Debug, Clone)]
 pub struct Model {
     pub name: String,
+    pub description: String,
     pub fields: Vec<Field>,
+}
+
+impl Model {
+    fn new(name: impl Into<String>, description: impl Into<String>, fields: Vec<Field>) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            fields,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -325,10 +343,30 @@ fn schema_nullability(schema: &Value) -> (String, bool) {
     }
 }
 
+fn trim_str(v: Option<&Value>) -> String {
+    v.and_then(Value::as_str).unwrap_or("").trim().to_string()
+}
+
+fn schema_description(schema: &Value) -> String {
+    trim_str(schema.get("description"))
+}
+
+/// Prefer `override` when non-empty; otherwise keep `fallback`.
+fn prefer_desc(fallback: String, override_desc: Option<&Value>) -> String {
+    let o = trim_str(override_desc);
+    if o.is_empty() { fallback } else { o }
+}
+
 fn field_from_schema(name: &str, schema: &Value, required: bool) -> Field {
+    let description = schema_description(schema);
     if let Some(r) = schema.get("$ref").and_then(Value::as_str) {
         let optional = !required;
-        return Field::from_lang(name, optional, LangTypes::named(&ref_name(r), optional));
+        return Field::from_lang(
+            name,
+            optional,
+            LangTypes::named(&ref_name(r), optional),
+            description,
+        );
     }
 
     let (base, nullable) = schema_nullability(schema);
@@ -345,10 +383,20 @@ fn field_from_schema(name: &str, schema: &Value, required: bool) -> Field {
             let (ibase, _) = schema_nullability(&items);
             LangTypes::primitive(&ibase, false)
         };
-        return Field::from_lang(name, optional, LangTypes::array(&inner, optional));
+        return Field::from_lang(
+            name,
+            optional,
+            LangTypes::array(&inner, optional),
+            description,
+        );
     }
 
-    Field::from_lang(name, optional, LangTypes::primitive(&base, optional))
+    Field::from_lang(
+        name,
+        optional,
+        LangTypes::primitive(&base, optional),
+        description,
+    )
 }
 
 fn ensure_ref(
@@ -421,13 +469,11 @@ fn collect_object_model(
     if models.contains_key(&model_name) {
         return Ok(model_name);
     }
+    let description = schema_description(schema);
     // Placeholder breaks cycles while fields are resolved.
     models.insert(
         model_name.clone(),
-        Model {
-            name: model_name.clone(),
-            fields: Vec::new(),
-        },
+        Model::new(model_name.clone(), description.clone(), Vec::new()),
     );
 
     let props = schema
@@ -454,10 +500,7 @@ fn collect_object_model(
 
     models.insert(
         model_name.clone(),
-        Model {
-            name: model_name.clone(),
-            fields,
-        },
+        Model::new(model_name.clone(), description, fields),
     );
     Ok(model_name)
 }
@@ -493,6 +536,8 @@ pub fn parse_document(doc: &Value) -> Result<Ir, String> {
             .ok_or_else(|| "method missing name".to_string())?
             .to_string();
 
+        let summary = trim_str(m.get("summary"));
+
         let fields: Vec<_> = m
             .get("params")
             .and_then(Value::as_array)
@@ -509,7 +554,10 @@ pub fn parse_document(doc: &Value) -> Result<Ir, String> {
                     .cloned()
                     .unwrap_or(Value::Object(Default::default()));
                 let required = p.get("required").and_then(Value::as_bool).unwrap_or(false);
-                Ok(field_from_schema(pname, &schema, required))
+                let mut field = field_from_schema(pname, &schema, required);
+                // OpenRPC param.description 优先于 schema.description。
+                field.description = prefer_desc(field.description, p.get("description"));
+                Ok(field)
             })
             .collect::<Result<_, String>>()?;
 
@@ -517,13 +565,7 @@ pub fn parse_document(doc: &Value) -> Result<Ir, String> {
             None
         } else {
             let t = type_name_from_rpc(&name, "Params");
-            models.insert(
-                t.clone(),
-                Model {
-                    name: t.clone(),
-                    fields,
-                },
-            );
+            models.insert(t.clone(), Model::new(t.clone(), summary.clone(), fields));
             Some(t)
         };
 
@@ -544,12 +586,7 @@ pub fn parse_document(doc: &Value) -> Result<Ir, String> {
             requires_auth: m.get("x-auth").and_then(Value::as_str) == Some("required"),
             params_type,
             result_type: (result_type_name != "null").then_some(result_type_name),
-            summary: m
-                .get("summary")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim()
-                .to_string(),
+            summary,
         });
     }
 
@@ -563,6 +600,7 @@ pub fn parse_document(doc: &Value) -> Result<Ir, String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
     #[test]
     fn change_password_fn_name() {
@@ -587,5 +625,48 @@ mod tests {
         let arr = super::LangTypes::array(&super::LangTypes::named("Account", false), true);
         assert_eq!(arr.kotlin, "List<Account>?");
         assert_eq!(arr.ts, "Account[] | null");
+    }
+
+    #[test]
+    fn field_and_params_descriptions() {
+        let doc = serde_json::json!({
+            "openrpc": "1.3.2",
+            "info": { "title": "T", "version": "0.1.0" },
+            "methods": [{
+                "name": "identity.account.login",
+                "summary": "登录",
+                "params": [{
+                    "name": "phone",
+                    "required": true,
+                    "schema": { "type": "string", "description": "手机号" }
+                }],
+                "result": { "name": "ok", "schema": { "type": "null" } }
+            }],
+            "components": {
+                "schemas": {
+                    "Account": {
+                        "type": "object",
+                        "properties": {
+                            "id": { "type": "string", "description": "账号ID" }
+                        },
+                        "required": ["id"]
+                    }
+                }
+            }
+        });
+        let ir = super::parse_document(&doc).expect("parse");
+        let account = ir
+            .models
+            .iter()
+            .find(|m| m.name == "Account")
+            .expect("Account");
+        assert_eq!(account.fields[0].description, "账号ID");
+        let params = ir
+            .models
+            .iter()
+            .find(|m| m.name == "IdentityAccountLoginParams")
+            .expect("Params");
+        assert_eq!(params.description, "登录");
+        assert_eq!(params.fields[0].description, "手机号");
     }
 }

@@ -1,6 +1,6 @@
 //! Tiny string builder + shared codegen helpers.
 
-use crate::model::{Ir, Method};
+use crate::model::{Ir, Method, Model};
 use std::fmt::Write as _;
 
 #[derive(Default)]
@@ -41,25 +41,58 @@ pub fn banner(o: &mut SourceBuf, ir: &Ir) {
     w!(o, "// Source: OpenRPC {} {}", ir.title, ir.version);
 }
 
-pub fn rpc_docs(o: &mut SourceBuf, m: &Method, style: DocStyle, indent: &str) {
-    let summary = m.summary_one_line();
-    let rpc = format!("RPC `{}`{}", m.name, m.auth_doc_suffix());
+/// Emit a doc comment from OpenRPC `description` / summary. No-op if blank.
+pub fn doc_comment(o: &mut SourceBuf, text: &str, style: DocStyle, indent: &str) {
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    if lines.is_empty() {
+        return;
+    }
     match style {
         DocStyle::TripleSlash => {
-            if !summary.is_empty() {
-                w!(o, "{indent}/// {summary}");
+            for line in lines {
+                w!(o, "{indent}/// {line}");
             }
-            w!(o, "{indent}/// {rpc}");
         }
         DocStyle::Block => {
-            if summary.is_empty() {
-                w!(o, "{indent}/** {rpc} */");
+            if let [line] = lines.as_slice() {
+                w!(o, "{indent}/** {line} */");
             } else {
-                w!(o, "{indent}/** {summary}");
-                w!(o, "{indent} *  {rpc}");
+                w!(o, "{indent}/**");
+                for line in lines {
+                    w!(o, "{indent} * {line}");
+                }
                 w!(o, "{indent} */");
             }
         }
+    }
+}
+
+pub fn rpc_docs(o: &mut SourceBuf, m: &Method, style: DocStyle, indent: &str) {
+    let summary = m.summary_one_line();
+    let rpc = format!("RPC `{}`{}", m.name, m.auth_doc_suffix());
+    let text = if summary.is_empty() {
+        rpc
+    } else {
+        format!("{summary}\n{rpc}")
+    };
+    doc_comment(o, &text, style, indent);
+}
+
+/// Emit model description, then `emit`, then a blank line.
+pub fn each_model(
+    o: &mut SourceBuf,
+    models: &[Model],
+    style: DocStyle,
+    mut emit: impl FnMut(&mut SourceBuf, &Model),
+) {
+    for model in models {
+        doc_comment(o, &model.description, style, "");
+        emit(o, model);
+        o.blank();
     }
 }
 

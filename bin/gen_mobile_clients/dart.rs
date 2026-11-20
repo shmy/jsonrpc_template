@@ -1,4 +1,4 @@
-use crate::emit::{DocStyle, SourceBuf, banner, each_method, w};
+use crate::emit::{DocStyle, SourceBuf, banner, doc_comment, each_method, each_model, w};
 use crate::model::{Field, Ir, dart_ident};
 
 fn is_primitive(ty: &str) -> bool {
@@ -85,9 +85,10 @@ pub fn generate(ir: &Ir) -> String {
     w!(o, "import 'package:http/http.dart' as http;");
     o.blank();
 
-    for model in &ir.models {
+    each_model(&mut o, &ir.models, DocStyle::TripleSlash, |o, model| {
         w!(o, "class {} {{", model.name);
         for f in &model.fields {
+            doc_comment(o, &f.description, DocStyle::TripleSlash, "  ");
             w!(o, "  final {} {};", f.dart_type, dart_ident(&f.name));
         }
         o.blank();
@@ -127,8 +128,7 @@ pub fn generate(ir: &Ir) -> String {
         }
         w!(o, "      }};");
         w!(o, "}}");
-        o.blank();
-    }
+    });
 
     o.line(RUNTIME.trim_end());
     o.blank();

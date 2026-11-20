@@ -1,4 +1,4 @@
-use crate::emit::{DocStyle, SourceBuf, banner, each_method, w};
+use crate::emit::{DocStyle, SourceBuf, banner, doc_comment, each_method, each_model, w};
 use crate::model::{Ir, kotlin_ident};
 
 pub fn generate(ir: &Ir) -> String {
@@ -12,21 +12,21 @@ pub fn generate(ir: &Ir) -> String {
     o.line(RUNTIME.trim_end());
     o.blank();
 
-    for model in &ir.models {
+    each_model(&mut o, &ir.models, DocStyle::Block, |o, model| {
         w!(o, "@Serializable");
         w!(o, "data class {}(", model.name);
         for (i, f) in model.fields.iter().enumerate() {
             let comma = if i + 1 < model.fields.len() { "," } else { "" };
             let default = if f.optional { " = null" } else { "" };
             let ident = kotlin_ident(&f.name);
+            doc_comment(o, &f.description, DocStyle::Block, "    ");
             if ident != f.name {
                 w!(o, "    @SerialName(\"{}\")", f.name);
             }
             w!(o, "    val {ident}: {}{default}{comma}", f.kotlin_type);
         }
         w!(o, ")");
-        o.blank();
-    }
+    });
 
     w!(o, "class JsonRpcClient(");
     w!(o, "    var endpoint: String = \"{}\",", ir.server);
