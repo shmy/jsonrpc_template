@@ -29,6 +29,8 @@ struct Inner {
     jwt_secret: SecretString,
     access_ttl_secs: u64,
     refresh_ttl_secs: u64,
+    /// 旧 refresh 重放宽限（秒）；`0` = 关闭，命中 `used_*` 即吊销。
+    grace_ttl_secs: u64,
     issuer: String,
     audience: String,
 }
@@ -45,6 +47,7 @@ impl TokenHelper {
         jwt_secret: SecretString,
         access_ttl_secs: u64,
         refresh_ttl_secs: u64,
+        grace_ttl_secs: u64,
         issuer: impl Into<String>,
         audience: impl Into<String>,
     ) -> Self {
@@ -54,6 +57,7 @@ impl TokenHelper {
                 jwt_secret,
                 access_ttl_secs,
                 refresh_ttl_secs,
+                grace_ttl_secs,
                 issuer: issuer.into(),
                 audience: audience.into(),
             }),
@@ -100,6 +104,11 @@ impl TokenHelper {
     pub fn refresh_ttl_secs(&self) -> u64 {
         self.inner.refresh_ttl_secs
     }
+
+    /// 旧 refresh 重放宽限（秒）；`0` 关闭。
+    pub fn grace_ttl_secs(&self) -> u64 {
+        self.inner.grace_ttl_secs
+    }
 }
 
 #[cfg(test)]
@@ -112,6 +121,7 @@ mod tests {
             SecretString::from("test-jwt-secret-at-least-32-bytes!!"),
             60,
             3600,
+            0,
             "modrun-template",
             "account",
         )
@@ -136,6 +146,7 @@ mod tests {
             SecretString::from("test-jwt-secret-at-least-32-bytes!!"),
             60,
             3600,
+            0,
             "other-issuer",
             "account",
         );
@@ -151,6 +162,7 @@ mod tests {
             SecretString::from("test-jwt-secret-at-least-32-bytes!!"),
             60,
             3600,
+            0,
             "modrun-template",
             "other-audience",
         );
@@ -166,6 +178,7 @@ mod tests {
             SecretString::from("another-jwt-secret-32-bytes-long!!!!"),
             60,
             3600,
+            0,
             "modrun-template",
             "account",
         );
@@ -181,6 +194,7 @@ mod tests {
             SecretString::from("test-jwt-secret-at-least-32-bytes!!"),
             0,
             3600,
+            0,
             "modrun-template",
             "account",
         );

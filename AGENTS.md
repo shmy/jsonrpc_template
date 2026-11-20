@@ -69,7 +69,7 @@ Feature 路由器上的 state 在 merge 时**不会带上**；不要在 feature 
 会话（JWT jti / refresh digest）跨多个 Redis key **无事务**：`issue_tokens` 部分写入失败时可能短暂半开会话；下次 login/refresh 会覆盖 subject 指针并清理旧 digest。每账号单会话模型。refresh **fail-closed**，分两段：
 - **commit 前**并发 `consume`：仅一人 `take` 成功；败者拿不到 `used_*` 时只得 `-32004`，**不**吊销胜者（见 `token_ops` 单测 `concurrent_refresh_does_not_revoke_winner`）
 - **轮换完成后**再用旧 refresh：命中 `used_*` → 吊销该账号全部会话（`-32004`），需重新 login
-如需缓解客户端超时重试，可给旧 token 加短宽限期（暂缓）。
+旧 refresh 重放宽限：`REFRESH_GRACE_TTL`（默认 `30s`；`0` 关闭）。宽限内重放返回缓存的新 pair，不吊销；过期后仍 fail-closed 吊销。
 
 Schema 变更：改 `*_contract` 模型 → `just migration-generate` → 提交 `toasty/` → master 启动或 `just migration-apply`。HTTP 集成测试用 `e2e/*.hurl`（`just e2e` 会清库再跑）；勿用 Rust `#[test]` 打 `/jsonrpc`。
 
@@ -178,13 +178,15 @@ Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `Fr
 - 泛型化 `AppState` 里的 `TokenHelper`（当前固定 `TokenRealm::Account` 单 realm）——出现第二个 token realm 时再引入注册表 / 多实例，勿提前设计
 - job_queue / scheduler（file GC 用 Lifecycle 间隔任务，仅 master）、多 cache 后端、双组合根
 - MFA / 多设备会话 / OIDC
+- 常见/breached 密码 denylist
 
-未完成项与优先级见 **`TODO.md`**。平台脚手架已对齐：CORS/超时/限流、ProbeRouter、CI/deny/compose、seed/`change_password`、blob/file。
+未完成项与优先级见 **`TODO.md`**。平台脚手架已对齐：CORS/超时/限流、ProbeRouter、CI/deny/compose、seed/`change_password`、blob/file、`REFRESH_GRACE_TTL`。
 
 ## 常用命令
 
 ```bash
 cp .env.example .env          # 首次；需 Postgres + Redis + JWT_SECRET（≥32）+（blob-fs）BLOB_FS_DOMAIN + BLOB_FS_PRESIGN_SECRET（≥32）
+just db-up                    # compose：仅 postgres + redis（api 本地跑）
 just check-fast identity      # 叶子迭代（固定 -p，勿与 --all-features 交替）
 just check                    # cargo check -p api（默认 otlp + blob-fs）
 just layering                 # 分层硬违规
@@ -195,6 +197,7 @@ just migration-generate       # 模型变更后生成 SQL
 just migration-apply          # 不经 api 启动、单独 apply
 just migration-reset          # psql DROP SCHEMA + `migrator migration apply`
 just e2e                      # reset → 临时 api（blob-fs，关 otlp）→ hurl
+just clients-check            # 生成物对齐 + bun session.test.ts
 cargo test --workspace --all-targets   # 含 seal 等 integration
 cargo test -p axum_jsonrpc -p identity -p file --lib --features blob-fs
 just pre_commit               # layering + machete + fixrs + fmt + clippy（含 --all-features）

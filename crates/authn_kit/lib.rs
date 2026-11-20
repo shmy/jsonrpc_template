@@ -13,6 +13,6 @@ pub mod keys;
 
 pub use error::AuthnError;
 pub use keys::{
-    access_jti_key, refresh_digest, refresh_key, refresh_key_from_digest, subject_refresh_key,
-    used_refresh_key,
+    access_jti_key, refresh_digest, refresh_grace_key, refresh_key, refresh_key_from_digest,
+    subject_refresh_key, used_refresh_key,
 };

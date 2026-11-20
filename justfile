@@ -9,6 +9,22 @@ dev:
 db-up:
     docker compose up -d
 
+db-down:
+    docker compose down
+
+# 客户端生成物对齐 + TS 会话单测（需 bun；OpenRPC 用 .clients/openrpc.json）
+clients-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo run -q -p gen_mobile_clients
+    if ! git diff --quiet -- .clients/; then
+      echo "error: .clients/ drifted from OpenRPC; commit just gen-clients output" >&2
+      git diff --stat -- .clients/ >&2
+      exit 1
+    fi
+    command -v bun >/dev/null || { echo "need bun for session.test.ts" >&2; exit 1; }
+    (cd .clients/typescript && bun session.test.ts)
+
 # fmt check + clippy（单 crate）
 lint crate:
     cargo fmt --all -- --check

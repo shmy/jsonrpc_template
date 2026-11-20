@@ -262,6 +262,15 @@ pub struct JwtCli {
     )]
     pub refresh_ttl: ReadableDuration,
 
+    /// 旧 refresh 重放宽限；`0` = 关闭（命中 used 即吊销）。客户端超时重试可设 `30s`。
+    #[arg(
+        id = "refresh_grace_ttl",
+        long = "refresh-grace-ttl",
+        default_value = "30s",
+        env = "REFRESH_GRACE_TTL"
+    )]
+    pub refresh_grace_ttl: ReadableDuration,
+
     #[arg(
         id = "jwt_issuer",
         long = "jwt-issuer",
@@ -471,6 +480,7 @@ mod tests {
     use std::env::set_var;
 
     fn base_args() -> Vec<&'static str> {
+        #[allow(unused_mut)] // mutated only when `fs` / `cos` features enable blob args
         let mut args = vec![
             "api",
             "--database-url",

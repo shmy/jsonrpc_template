@@ -12,10 +12,11 @@ cp .env.example .env
 
 cargo run -p api
 # 或热重载：just dev
+# 依赖：just db-up（compose 仅 Postgres + Redis；宿主机 5433 / 6380）
 # 单独建表 / 升级（不启动 api）：just migration-apply
 ```
 
-默认监听 `http://0.0.0.0:8080`。多实例时只让一个进程 `MASTER=true`（migrate / seed / GC），其余保持默认 `false`。
+默认监听 `http://0.0.0.0:8080`。多实例时只让一个进程 `MASTER=true`（migrate / seed / GC），其余保持默认 `false`。生产反代 / 限流要点见 [`docs/production.md`](docs/production.md)。
 
 ## HTTP 端点
 
@@ -60,7 +61,7 @@ Playground 发起调用时会使用文档里的 `servers[].url`（模板默认 `
 
 示范方法：`identity.account.*`（create / read / update / delete / search / **login / refresh / logout**；Postgres + toasty；password argon2id；会话在 Redis）。
 
-公开 RPC（`PublicRpc`）：`identity.account.{login,refresh}`。其余方法进 `PrivateRpc`，由 `http_server` 在 merge 时统一 `before_each` 鉴权（缺 token → `-32020`）。`/jsonrpc` 仍为软鉴权中间件；`create` 需登录且恒为 `privileged=false`（管理员仅 seed；模板未做注册配额，adopters 按需收紧）；`read`/`search` 任意登录可查全库（含手机号等字段，密码/`privileged` 不返回）；`update`/`delete` 本人或 `privileged` 可操作他人（`privileged` 账号禁止删除）。
+公开 RPC（`PublicRpc`）：`identity.account.{login,refresh}`。其余方法进 `PrivateRpc`，由 `http_server` 在 merge 时统一 `before_each` 鉴权（缺 token → `-32020`）。`/jsonrpc` 仍为软鉴权中间件；`create` 需登录且恒为 `privileged=false`（管理员仅 seed；模板未做注册配额，adopters 按需收紧）；`read`/`search` 任意登录可查全库（含手机号等字段，密码/`privileged` 不返回）；`update`/`delete` 本人或 `privileged` 可操作他人（`privileged` 账号禁止删除）。refresh 默认 `REFRESH_GRACE_TTL=30s` 宽限内重放幂等。
 
 默认 seed（`.env.example` / `cargo run`）：`SEED_ADMIN_PHONE=13888888888`、`SEED_ADMIN_PASSWORD=admin123!`。  
 `just e2e` 会注入另一套：`13800000777` / `seed-pass-1`（并先清库）——勿与默认 curl 混用。
@@ -201,7 +202,7 @@ toasty/                 # embedded migration 产物
 ## 开发命令
 
 ```bash
-just db-up                # docker compose：Postgres + Redis
+just db-up                # docker compose：仅 Postgres + Redis（api 本地 cargo run）
 just check-fast identity  # 叶子迭代：cargo check -p <crate>（固定形态，勿与 --all-features 交替）
 just check                # cargo check -p api（默认 otlp + blob-fs）
 just layering             # feature/infra/crate 分层硬违规
@@ -213,6 +214,7 @@ cargo test --workspace --all-targets  # 单元 + seal 等（不含 HTTP e2e）
 cargo run -p api          # 另开终端
 just migration-reset      # psql DROP SCHEMA + `migrator migration apply`（需 psql）
 just e2e                  # reset → 临时 api → hurl（需 hurl、psql、Postgres、Redis、JWT_SECRET）
+just clients-check        # OpenRPC 生成物对齐 + bun session.test.ts
 ```
 
 方法命名：点分域 `identity.account.create`；API 版本取 `api` 包版本写入 OpenRPC `info.version`（不在方法名里嵌版本前缀）。

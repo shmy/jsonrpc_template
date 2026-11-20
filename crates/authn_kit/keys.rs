@@ -27,6 +27,11 @@ pub fn used_refresh_key(realm: &str, digest: &str) -> String {
     format!("auth:{realm}:refresh_used:{digest}")
 }
 
+/// 轮换宽限期内缓存的新 [`TokenPair`]（见 identity `token_ops`）；TTL = `REFRESH_GRACE_TTL`。
+pub fn refresh_grace_key(realm: &str, digest: &str) -> String {
+    format!("auth:{realm}:refresh_grace:{digest}")
+}
+
 // sha2 0.11 的 digest 输出未实现 LowerHex，需手动转 hex。
 fn sha256_hex(value: &str) -> String {
     use std::fmt::Write;

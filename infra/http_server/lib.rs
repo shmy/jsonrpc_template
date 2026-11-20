@@ -93,6 +93,7 @@ fn provide_app_state(db: Db, cache: Cache, blob: Blob, cli: Cli) -> AppState {
         cli.jwt.secret.clone(),
         cli.jwt.access_ttl.duration().as_secs(),
         cli.jwt.refresh_ttl.duration().as_secs(),
+        cli.jwt.refresh_grace_ttl.duration().as_secs(),
         cli.jwt.issuer.clone(),
         cli.jwt.audience.clone(),
     );
