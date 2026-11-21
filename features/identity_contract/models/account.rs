@@ -13,8 +13,9 @@ pub struct Account {
     pub id: Id,
     /// 姓名
     pub name: String,
-    /// 手机号
+    /// 手机号（库内明文；RPC 出站脱敏为 `138****8888`）
     #[unique]
+    #[serde(serialize_with = "crate::phone::serialize_masked_phone")]
     pub phone: String,
     #[serde(skip_serializing)]
     /// 密码

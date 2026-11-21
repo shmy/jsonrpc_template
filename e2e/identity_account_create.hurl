@@ -58,7 +58,7 @@ HTTP 200
 jsonpath "$.jsonrpc" == "2.0"
 jsonpath "$.id" == 1
 jsonpath "$.result.name" == "Alice"
-jsonpath "$.result.phone" == "13800000001"
+jsonpath "$.result.phone" == "138****0001"
 jsonpath "$.result.id" isString
 jsonpath "$.result.password" not exists
 jsonpath "$.result.privileged" not exists

@@ -14,5 +14,5 @@ pub use error::{IdentityError, codes};
 pub use id::Id;
 pub use models::account::Account;
 pub use password::Password;
-pub use phone::{is_cn_mobile, validate_phone_format};
+pub use phone::{is_cn_mobile, mask_for_wire, validate_phone_format};
 pub use refresh_token::RefreshToken;

@@ -32,6 +32,7 @@ fn provide_private_methods() -> Result<PrivateRpc, RegisterError> {
             .register(methods::logout_account::logout_account_rpc)?
             .register(methods::read_account::read_account_rpc)?
             .register(methods::update_account::update_account_rpc)?
-            .register(methods::search_account::search_account_rpc)?,
+            .register(methods::search_account::search_account_rpc)?
+            .register(methods::account_profile::account_profile_rpc)?,
     ))
 }

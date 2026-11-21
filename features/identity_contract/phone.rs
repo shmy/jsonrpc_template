@@ -1,7 +1,8 @@
-//! 手机号 wire 形态校验（login / create 共用的 validify 自定义规则）。
+//! 手机号 wire 形态校验与出站脱敏（login / create 共用的 validify 自定义规则）。
 //!
 //! 放契约层：与 `Password` 同类，是 schema 形态规则而非业务语义。
 
+use serde::Serializer;
 use validify::ValidationError;
 
 /// 中国大陆手机号固定 11 位。
@@ -31,6 +32,28 @@ pub fn is_cn_mobile(phone: &str) -> bool {
         && bytes.first() == Some(&b'1')
         && bytes.get(1).is_some_and(|b| (b'3'..=b'9').contains(b))
         && bytes.iter().skip(2).all(|b| b.is_ascii_digit())
+}
+
+/// RPC 出站脱敏：保留前 3 / 后 4，中间 `****`（例 `138****8888`）。
+///
+/// 非规范 11 位形态整段替换为 `***`，避免半截明文泄漏（库内仍存明文；仅 `Serialize` 路径）。
+#[must_use]
+pub fn mask_for_wire(phone: &str) -> String {
+    if phone.len() == CN_MOBILE_DIGITS
+        && let (Some(prefix), Some(suffix)) = (phone.get(..3), phone.get(7..))
+    {
+        format!("{prefix}****{suffix}")
+    } else {
+        "***".to_owned()
+    }
+}
+
+/// `Account.phone` 的 `serialize_with`：库字段仍是明文 `String`，wire 上走 [`mask_for_wire`]。
+pub fn serialize_masked_phone<S>(phone: &String, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&mask_for_wire(phone))
 }
 
 #[cfg(test)]
@@ -79,5 +102,18 @@ mod tests {
         for bad in ["138a888888", "１３８８８８８８８８８"] {
             assert!(validate_phone_format(bad).is_err(), "rejected `{bad}`");
         }
+    }
+
+    #[test]
+    fn masks_cn_mobile_for_wire() {
+        assert_eq!(mask_for_wire("13888888888"), "138****8888");
+        assert_eq!(mask_for_wire("15912345678"), "159****5678");
+    }
+
+    #[test]
+    fn masks_non_canonical_as_opaque() {
+        assert_eq!(mask_for_wire(""), "***");
+        assert_eq!(mask_for_wire("138"), "***");
+        assert_eq!(mask_for_wire("+8613888888888"), "***");
     }
 }

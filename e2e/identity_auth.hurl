@@ -37,7 +37,7 @@ Accept-Language: en
 }
 HTTP 200
 [Asserts]
-jsonpath "$.result.phone" == "13800000999"
+jsonpath "$.result.phone" == "138****0999"
 jsonpath "$.result.password" not exists
 jsonpath "$.result.privileged" not exists
 jsonpath "$.error" not exists

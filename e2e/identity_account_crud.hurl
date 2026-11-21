@@ -63,7 +63,7 @@ HTTP 200
 account_id: jsonpath "$.result.id"
 [Asserts]
 jsonpath "$.result.name" == "Carol"
-jsonpath "$.result.phone" == "13800000002"
+jsonpath "$.result.phone" == "138****0002"
 jsonpath "$.result.password" not exists
 jsonpath "$.result.privileged" not exists
 jsonpath "$.error" not exists
@@ -104,7 +104,7 @@ Accept-Language: en
 }
 HTTP 200
 [Asserts]
-jsonpath "$.result.phone" == "13800000005"
+jsonpath "$.result.phone" == "138****0005"
 jsonpath "$.result.privileged" not exists
 jsonpath "$.error" not exists
 

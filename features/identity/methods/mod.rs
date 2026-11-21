@@ -3,6 +3,7 @@
 //! - **PublicRpc**（匿名）：`login_account` / `refresh_account`
 //! - **PrivateRpc**（需登录）：其余全部
 
+pub(crate) mod account_profile;
 pub(crate) mod change_password;
 pub(crate) mod create_account;
 pub(crate) mod delete_account;
