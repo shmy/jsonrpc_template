@@ -49,7 +49,7 @@ pub fn mask_for_wire(phone: &str) -> String {
 }
 
 /// `Account.phone` 的 `serialize_with`：库字段仍是明文 `String`，wire 上走 [`mask_for_wire`]。
-pub fn serialize_masked_phone<S>(phone: &String, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_masked_phone<S>(phone: &str, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
