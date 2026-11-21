@@ -1,4 +1,4 @@
-# identity.account.login / refresh / logout / change_password（需 Redis + JWT_SECRET）
+# identity.account.login / refresh / logout / change_password / current（需 Redis + JWT_SECRET）
 # 固定手机号，依赖 `just e2e` 先清库；用 seed 登录拿 Bearer 再 create（任意登录均可 create）
 
 # seed admin login
@@ -85,6 +85,41 @@ jsonpath "$.error" not exists
 [Captures]
 access_token: jsonpath "$.result.access_token"
 refresh_token: jsonpath "$.result.refresh_token"
+
+
+# current without bearer → -32020
+POST {{base_url}}/jsonrpc
+Content-Type: application/json
+Accept-Language: en
+{
+  "jsonrpc": "2.0",
+  "id": 2.4,
+  "method": "identity.account.current"
+}
+HTTP 200
+[Asserts]
+jsonpath "$.error.code" == -32020
+jsonpath "$.result" not exists
+
+
+# current with bearer → 当前登录账号
+POST {{base_url}}/jsonrpc
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+Accept-Language: en
+{
+  "jsonrpc": "2.0",
+  "id": 2.5,
+  "method": "identity.account.current"
+}
+HTTP 200
+[Asserts]
+jsonpath "$.result.name" == "Auth User"
+jsonpath "$.result.phone" == "138****0999"
+jsonpath "$.result.id" isString
+jsonpath "$.result.password" not exists
+jsonpath "$.result.privileged" not exists
+jsonpath "$.error" not exists
 
 
 # bad password → -32003

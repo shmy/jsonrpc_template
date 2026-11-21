@@ -5,10 +5,10 @@ use identity_contract::Account;
 use rootcause::Result;
 use toasty::Db;
 
-/// 获取账号个人资料（PrivateRpc；仅允许当前账号访问）
-#[rpc("identity.account.profile")]
+/// 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
+#[rpc("identity.account.current")]
 #[tracing::instrument(skip(db), fields(%caller))]
-pub async fn account_profile(
+pub async fn current_account(
     AuthedAccount(caller): AuthedAccount,
     State(mut db): State<Db>,
 ) -> Result<Account> {
