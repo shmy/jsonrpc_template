@@ -1,6 +1,6 @@
 # Kotlin JSON-RPC client
 
-由 `gen_mobile_clients` 生成。默认 endpoint：`http://127.0.0.1:19001/jsonrpc`。
+由 `gen_mobile_clients` 生成。默认 endpoint：`http://127.0.0.1:9000/jsonrpc`。
 
 依赖：`kotlinx-serialization-json`。会话语义见根 `README.md`。阻塞 HTTP：勿在 Android 主线程调用。
 

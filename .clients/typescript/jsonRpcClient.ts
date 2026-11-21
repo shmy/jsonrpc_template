@@ -61,7 +61,7 @@ export interface Account {
   id: string;
   /** 姓名 */
   name: string;
-  /** 手机号 */
+  /** 手机号（库内明文；RPC 出站脱敏为 `138****8888`） */
   phone: string;
   /** 备注 */
   remark: string | null;
@@ -99,7 +99,7 @@ export interface IdentityAccountCreateParams {
   remark: string | null;
 }
 
-/** 软删账号（本人或 privileged 删他人；特权账号禁删） */
+/** 删除账号（本人或 privileged 删他人；特权账号禁删） */
 export interface IdentityAccountDeleteParams {
   /** 账号 ID */
   id: string;
@@ -190,7 +190,7 @@ export class JsonRpcClient {
   private readonly _fetch: typeof fetch;
 
   constructor(options: JsonRpcClientOptions = {}) {
-    this.endpoint = options.endpoint ?? "http://127.0.0.1:19001/jsonrpc";
+    this.endpoint = options.endpoint ?? "http://127.0.0.1:9000/jsonrpc";
     this.accessToken = options.accessToken ?? null;
     this.refreshToken = options.refreshToken ?? null;
     this.acceptLanguage = options.acceptLanguage ?? null;
@@ -418,7 +418,15 @@ export class JsonRpcClient {
   }
 
   /**
-   * 软删账号（本人或 privileged 删他人；特权账号禁删）
+   * 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
+   * RPC `identity.account.current` (Bearer required)
+   */
+  async identityAccountCurrent(): Promise<Account> {
+    return await this.call<Account>("identity.account.current", undefined, true);
+  }
+
+  /**
+   * 删除账号（本人或 privileged 删他人；特权账号禁删）
    * RPC `identity.account.delete` (Bearer required)
    */
   async identityAccountDelete(params: IdentityAccountDeleteParams): Promise<void> {

@@ -15,7 +15,7 @@ class Account {
   final String id;
   /// 姓名
   final String name;
-  /// 手机号
+  /// 手机号（库内明文；RPC 出站脱敏为 `138****8888`）
   final String phone;
   /// 备注
   final String? remark;
@@ -137,7 +137,7 @@ class IdentityAccountCreateParams {
       };
 }
 
-/// 软删账号（本人或 privileged 删他人；特权账号禁删）
+/// 删除账号（本人或 privileged 删他人；特权账号禁删）
 class IdentityAccountDeleteParams {
   /// 账号 ID
   final String id;
@@ -407,7 +407,7 @@ class JsonRpcSessionExpiredException implements Exception {
 
 class JsonRpcClient {
   JsonRpcClient({
-    this.endpoint = 'http://127.0.0.1:19001/jsonrpc',
+    this.endpoint = 'http://127.0.0.1:9000/jsonrpc',
     this.accessToken,
     this.refreshToken,
     this.acceptLanguage,
@@ -631,7 +631,14 @@ class JsonRpcClient {
     return Account.fromJson(result as Map<String, dynamic>);
   }
 
-  /// 软删账号（本人或 privileged 删他人；特权账号禁删）
+  /// 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
+  /// RPC `identity.account.current` (Bearer required)
+  Future<Account> identityAccountCurrent() async {
+    final result = await _post(method: 'identity.account.current', params: null, requiresAuth: true);
+    return Account.fromJson(result as Map<String, dynamic>);
+  }
+
+  /// 删除账号（本人或 privileged 删他人；特权账号禁删）
   /// RPC `identity.account.delete` (Bearer required)
   Future<void> identityAccountDelete(IdentityAccountDeleteParams params) async {
     await _post(method: 'identity.account.delete', params: params.toJson(), requiresAuth: true);

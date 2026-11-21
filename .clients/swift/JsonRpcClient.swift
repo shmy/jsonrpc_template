@@ -64,7 +64,7 @@ public struct Account: Codable, Sendable {
     public var id: String
     /// 姓名
     public var name: String
-    /// 手机号
+    /// 手机号（库内明文；RPC 出站脱敏为 `138****8888`）
     public var phone: String
     /// 备注
     public var remark: String?
@@ -130,7 +130,7 @@ public struct IdentityAccountCreateParams: Codable, Sendable {
     }
 }
 
-/// 软删账号（本人或 privileged 删他人；特权账号禁删）
+/// 删除账号（本人或 privileged 删他人；特权账号禁删）
 public struct IdentityAccountDeleteParams: Codable, Sendable {
     /// 账号 ID
     public var id: String
@@ -262,7 +262,7 @@ public final class JsonRpcClient: @unchecked Sendable {
     public var acceptLanguage: String?
     public var session: URLSession
 
-    public init(endpoint: URL = URL(string: "http://127.0.0.1:19001/jsonrpc")!, accessToken: String? = nil, refreshToken: String? = nil, acceptLanguage: String? = nil, session: URLSession = .shared) {
+    public init(endpoint: URL = URL(string: "http://127.0.0.1:9000/jsonrpc")!, accessToken: String? = nil, refreshToken: String? = nil, acceptLanguage: String? = nil, session: URLSession = .shared) {
         self.endpoint = endpoint
         self.accessToken = accessToken
         self.refreshToken = refreshToken
@@ -516,7 +516,13 @@ public final class JsonRpcClient: @unchecked Sendable {
         return try await call(method: "identity.account.create", params: params, requiresAuth: true, as: Account.self)
     }
 
-    /// 软删账号（本人或 privileged 删他人；特权账号禁删）
+    /// 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
+    /// RPC `identity.account.current` (Bearer required)
+    public func identityAccountCurrent() async throws -> Account {
+        return try await call(method: "identity.account.current", params: Optional<EmptyParams>.none, requiresAuth: true, as: Account.self)
+    }
+
+    /// 删除账号（本人或 privileged 删他人；特权账号禁删）
     /// RPC `identity.account.delete` (Bearer required)
     public func identityAccountDelete(_ params: IdentityAccountDeleteParams) async throws {
         let _: NullResult = try await call(method: "identity.account.delete", params: params, requiresAuth: true, as: NullResult.self)

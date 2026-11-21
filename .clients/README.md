@@ -13,7 +13,7 @@ cargo run -p gen_mobile_clients  # 仅生成（需已有 .clients/openrpc.json�
 | `openrpc.json` | OpenRPC 文档 |
 | `swift/` `kotlin/` `dart/` `typescript/` | 客户端 + README + 冒烟 |
 
-默认 endpoint：`http://127.0.0.1:19001/jsonrpc`；seed：`13888888888` / `admin123!`。
+默认 endpoint：`http://127.0.0.1:9000/jsonrpc`；seed：`13888888888` / `admin123!`。
 
 ## 会话
 

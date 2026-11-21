@@ -51,7 +51,7 @@ data class Account(
     val id: String,
     /** 姓名 */
     val name: String,
-    /** 手机号 */
+    /** 手机号（库内明文；RPC 出站脱敏为 `138****8888`） */
     val phone: String,
     /** 备注 */
     val remark: String? = null,
@@ -92,7 +92,7 @@ data class IdentityAccountCreateParams(
     val remark: String? = null
 )
 
-/** 软删账号（本人或 privileged 删他人；特权账号禁删） */
+/** 删除账号（本人或 privileged 删他人；特权账号禁删） */
 @Serializable
 data class IdentityAccountDeleteParams(
     /** 账号 ID */
@@ -177,7 +177,7 @@ data class TokenResponse(
 )
 
 class JsonRpcClient(
-    var endpoint: String = "http://127.0.0.1:19001/jsonrpc",
+    var endpoint: String = "http://127.0.0.1:9000/jsonrpc",
     @Volatile var accessToken: String? = null,
     @Volatile var refreshToken: String? = null,
     var acceptLanguage: String? = null,
@@ -419,7 +419,16 @@ class JsonRpcClient(
     }
 
     /**
-     * 软删账号（本人或 privileged 删他人；特权账号禁删）
+     * 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
+     * RPC `identity.account.current` (Bearer required)
+     */
+    fun identityAccountCurrent(): Account {
+        val result = post(method = "identity.account.current", params = null, requiresAuth = true) ?: throw JsonRpcClientException.MissingResult
+        return json.decodeFromJsonElement<Account>(result)
+    }
+
+    /**
+     * 删除账号（本人或 privileged 删他人；特权账号禁删）
      * RPC `identity.account.delete` (Bearer required)
      */
     fun identityAccountDelete(params: IdentityAccountDeleteParams) {
