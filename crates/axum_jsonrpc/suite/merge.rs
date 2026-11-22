@@ -18,7 +18,8 @@ use super::super::parse::{ParseCall, parse_call};
 use super::super::router::{DispatchOutcome, RegisterError, RpcRouter, is_json_content_type};
 use super::super::types::{ErrorObject, Id, MAX_BATCH_LEN, MAX_BODY_BYTES, Response, error_codes};
 use super::common::{
-    TEST_TRACE_ID, assert_single_error, parse_call_json, parts, raw_json, result_value,
+    TEST_TRACE_ID, assert_request_id, assert_single_error, parse_call_json, parts, raw_json,
+    result_value,
 };
 
 #[test]
@@ -294,10 +295,5 @@ async fn merge_keeps_other_trace_id_fallback_when_self_empty() {
         )
         .await
         .unwrap();
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let v: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(
-        v["error"]["data"]["trace_id"],
-        "dddddddddddddddddddddddddddddddd"
-    );
+    assert_request_id(&response, "dddddddddddddddddddddddddddddddd");
 }

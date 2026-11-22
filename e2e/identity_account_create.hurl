@@ -83,7 +83,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.error.code" == -32001
 jsonpath "$.error.message" == "账号已存在"
-jsonpath "$.error.data.trace_id" isString
+header "x-request-id" matches /^[0-9a-f]{32}$/
 jsonpath "$.result" not exists
 
 # 密码太短（< 8 位）→ -32602 Invalid params（Password 运行时校验）
@@ -105,5 +105,5 @@ HTTP 200
 [Asserts]
 jsonpath "$.error.code" == -32602
 jsonpath "$.error.message" == "password: Password must be 8-64 characters long"
-jsonpath "$.error.data.trace_id" isString
+header "x-request-id" matches /^[0-9a-f]{32}$/
 jsonpath "$.result" not exists

@@ -736,7 +736,7 @@
       }).join('') || '<tr><td colspan="2">（未声明）</td></tr>') +
       '</table>' +
       '<div class="orv-hint">调试私有方法：先调用 <code>identity.account.login</code> 拿到 access token，' +
-      '粘贴到右上角 Bearer Token。失败请求的 <code>trace_id</code> 可用于服务端日志检索。</div>';
+      '粘贴到右上角 Bearer Token。响应头 <code>x-request-id</code> 可用于服务端日志检索。</div>';
 
     var copyAll = mainEl.querySelector('#orv-copy-all-llm');
     if (copyAll) {
@@ -755,7 +755,7 @@
     mainEl.innerHTML =
       '<h2>标准错误码</h2>' +
       '<div class="orv-desc"><p>JSON-RPC 2.0 协议层错误。业务域错误为 <code>-320xx</code> 稳定码段，' +
-      '响应中的 <code>error.data.trace_id</code> 可用于追踪服务端日志。</p></div>' +
+      '响应头 <code>x-request-id</code> 可用于追踪服务端日志。</p></div>' +
       '<table><tr><th>name</th><th>code</th><th>message</th></tr>' + rows + '</table>';
   }
 
@@ -984,7 +984,8 @@
             headers: headers,
             status: res.status,
             latency: Math.round(performance.now() - started),
-            bodyText: bodyText
+            bodyText: bodyText,
+            requestId: res.headers.get('x-request-id') || ''
           });
           renderResponse(out, method, 0);
         });
@@ -1006,10 +1007,7 @@
     try { body = JSON.parse(entry.bodyText); } catch (e) { body = entry.bodyText; }
     var items = Array.isArray(body) ? body : [body];
     var traceIds = [];
-    items.forEach(function (it) {
-      var t = it && typeof it === 'object' && it.error && it.error.data && it.error.data.trace_id;
-      if (t && traceIds.indexOf(String(t)) < 0) traceIds.push(String(t));
-    });
+    if (entry.requestId) traceIds.push(String(entry.requestId));
     var ok = entry.status >= 200 && entry.status < 300 &&
       !items.some(function (it) { return it && typeof it === 'object' && it.error; });
 
@@ -1019,7 +1017,7 @@
     html += '<span class="orv-latency">' + entry.latency + ' ms</span>';
     traceIds.slice(0, 3).forEach(function (t) {
       html += '<button class="orv-trace" data-trace="' + esc(t) + '" title="点击复制：' +
-        esc(t) + '">trace_id: ' + esc(short(t, 8)) + '…</button>';
+        esc(t) + '">x-request-id: ' + esc(short(t, 8)) + '…</button>';
     });
     html += '<span class="orv-resp-actions">';
     if (!Array.isArray(body) && body && typeof body === 'object' && body.result &&

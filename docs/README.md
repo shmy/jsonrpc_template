@@ -46,7 +46,7 @@ http_server 并重启服务；直接改源 `openrpc-viewer.js` **不会**反映�
             切方法：`flushEditorCache`（靠 currentMethodName，因 hashchange 时 hash 已变）+ `renderMethod` 末尾按 respHistory 重画响应
 主题        CSS 变量驱动：data-theme=auto|dark|light；亮色变量块注入两份（light + prefers-color-scheme）；独立页同步 body 背景
 调试辅助    fmtTime / short / isAuthRequired(x-auth) / setToken / pushHistory(cap 8) / resolveLang(系统→en-US|zh-CN)
-工具        esc / mdLite(极简 markdown) / copyText / highlightJson(JSON 语法高亮+trace_id 标黄)
+工具        esc / mdLite(极简 markdown) / copyText / highlightJson(JSON 语法高亮；历史键名 `trace_id` 仍标黄)
 schema 工具  resolveRef($ref→components) / typeLabel(数组→Item[]) / schemaRows(嵌套→a.b、数组→name[].x，深 3 层) / paramsSchemaOf(由 content descriptors 重建)
 样式        injectCss()：所有主题色收在 .orv 根上的一组 CSS 变量（--bg/--accent/--ok/--err/--amber/--code-bg…）
 页面骨架     mount()：standalone 判定（自动建根 or 根直挂 body）→ 重置 body margin，不碰第三方宿主

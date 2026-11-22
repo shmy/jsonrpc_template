@@ -38,5 +38,9 @@ axum-tracing-opentelemetry = { workspace = true, optional = true }
 http_1 = { workspace = true, optional = true }
 toasty = { workspace = true }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+tower = { workspace = true }
+
 [lints]
 workspace = true

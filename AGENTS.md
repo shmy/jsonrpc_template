@@ -130,7 +130,7 @@ Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `Fr
 | `-32030..-32039` | `file_contract` | file：attachment（`-32032..-32034`）；`-32035` 仅 test 后端 / 未配置本地 presign；`-32030/31` 已退役勿复用 |
 
 - 基础设施失败（DB 驱动等）→ **`-32603`**（`http_server` 经 `set_internal_error_message` 用 locale 渲染 message）
-- **不要**把业务详情塞进 `error.data`（框架仅在错误上注入 `trace_id`）
+- **不要**把业务详情塞进 `error.data`（关联 id 走响应头 `x-request-id`，成功/失败都回）
 - **跨 feature 共享**的领域错误放在 `*_contract`：`#[error("snake_case_key")]` + `rpc_code()`；基础设施失败不要包进该枚举
 - 套路：
   - Handler / helper：`rootcause::Result`；外库直接 `?`
@@ -146,7 +146,8 @@ Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `Fr
 ## 可观测性
 
 - RPC span：`jsonrpc.call` / `jsonrpc.batch`，字段 `rpc.*`
-- 错误响应：`error.data.trace_id`（成功响应不加）
+- 关联 id：响应头 `x-request-id`（协议核 `/jsonrpc` 全路径；模板 busy 树 timeout 中间件预解析 `ResolvedRequestId`，覆盖 408 / 外层 413 / PublicRouter，探针除外；入站 `traceparent` → `x-request-id` → 归一化 fallback → mint）。自定义组合根若不用该中间件，需自行插入 `ResolvedRequestId`，或依赖 `RpcRouter::trace_id_fallback`（otel 下 `instrument_router` 已装）
+- 破坏性：无 `attach_trace_id`；勿再读 `error.data.trace_id`；`-32007` 的 `data` 为字符串限额说明
 - Metrics：`RpcObserver`；OTLP 由 **`api` feature `otlp`**（默认开）门控
 - 本地可关 OTLP：`cargo run -p api --no-default-features --features blob-fs`（或 `blob-cos`）
 
@@ -209,7 +210,7 @@ just dev                      # cargo watch -x "run -p api"
 - [ ] 依赖方向未破坏（`just layering`；核 ← 模板 ← feature；feature 之间只经 `*_contract`）
 - [ ] 新 RPC：默认进 `PrivateRpc`；仅匿名方法进 `PublicRpc`；`bin/api` 已 `init_group` 且 module 排在 `http_server` 之前
 - [ ] 业务错误有稳定 `-320xx`（避开协议 `-32007`/`-32010` 与 authn `-32020..`）：`module()` 内同时 `register_domain_mapper` + `register_ftl`（漏注册会变 `-32603`；挂在 `http_server` 之后会 seal 后注册 panic）；authn 勿在 feature 重复注册
-- [ ] 未在成功响应里塞 `trace_id`；未滥用 `error.data` 传业务字段
+- [ ] `/jsonrpc` 响应带 `x-request-id`；未滥用 `error.data` 传业务字段 / 未再往 body 塞 `trace_id`
 - [ ] AppState：`persistence` 提供 `Db`，`cache` 提供 Redis，`blob` 提供 `Blob`，`http_server` 包成 `AppState` 后 `with_state`；feature 只用 `RpcRouter::<AppState>::new()`
 - [ ] 需 caller id 时用 `AuthedAccount`；登录门槛靠 `PrivateRpc`（勿对 `/jsonrpc` 强制 Bearer）；默认依赖勿照抄 identity 整图
 - [ ] 私有 RPC 按 id 操作资源时默认做归属：identity 用 `access::load_for_mutate` / `load_for_delete`（非特权改删他人 / 删特权账号 → `-32009`）；`read`/`search` 可开放全库。配 e2e 越权断言（曾因漏写导致任意账号越权）

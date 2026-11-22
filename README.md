@@ -55,7 +55,7 @@ https://playground.open-rpc.org/?schemaUrl=https://example.com/openrpc.json
 
 Playground 发起调用时会使用文档里的 `servers[].url`（模板默认 `http://127.0.0.1:8080/jsonrpc`）。
 
-本地可设 `DOCS_ENABLED=true` 后打开 `http://127.0.0.1:8080/docs`——服务端自带的文档调试页（引擎在 `docs/openrpc-viewer.js`，零依赖单文件 JS，`/docs` 内嵌同源托管）：渲染全部方法文档，并支持在线发调试请求（Bearer Token、`Accept-Language`、`trace_id` 展示、一键复制 curl、batch），无需 Playground / 公网隧道。该 JS 也可被任意静态页面 `<script src>` 引入（用 `data-url` 指定 schema 地址），但与 API 不同源时需配置 `CORS_ORIGINS`。迭代 viewer 的上下文与硬性约束见 `docs/README.md`。
+本地可设 `DOCS_ENABLED=true` 后打开 `http://127.0.0.1:8080/docs`——服务端自带的文档调试页（引擎在 `docs/openrpc-viewer.js`，零依赖单文件 JS，`/docs` 内嵌同源托管）：渲染全部方法文档，并支持在线发调试请求（Bearer Token、`Accept-Language`、`x-request-id` 展示、一键复制 curl、batch），无需 Playground / 公网隧道。该 JS 也可被任意静态页面 `<script src>` 引入（用 `data-url` 指定 schema 地址），但与 API 不同源时需配置 `CORS_ORIGINS`。迭代 viewer 的上下文与硬性约束见 `docs/README.md`。
 
 ### JSON-RPC 示例（identity）
 
@@ -108,9 +108,13 @@ curl -s http://127.0.0.1:8080/jsonrpc \
 
 业务错误示范（**同一手机号再次 create** → 自定义 `-32001`）。`message` 随 `Accept-Language` 在 `en` / `zh-CN` 间切换。identity 号段：`-32001` 重复、`-32002` 不存在、`-32003` 凭据错误、`-32004` refresh 无效、`-32005` 登录/刷新限流（login 与 auth 文案区分、同码）、`-32006` 新旧密码相同、`-32008` 原密码错误、`-32009` 越权（跳过协议占用的 `-32007`）。会话基础设施错误走 authn 号段（码段与 FTL 由 `http_auth` 在 `http_server` seal 前注册，`authn_kit` 不感知 RPC）：`-32020` access 缺失、`-32021` 无效、`-32022` 已吊销、`-32023` 缓存不可用。协议核另占用 `-32007`（body 过大）、`-32010`（batch 过长）。
 
-客户端按 `code` 分支即可；业务层不传自定义 `data`。框架在**错误**响应上注入 `error.data.trace_id`。成功响应不加 `trace_id`。
+客户端按 `code` 分支即可；业务层不传自定义 `data`。
 
-Batch 请求传 JSON 数组即可；通知（无 `id`）不返回 body。
+关联 id 统一走响应头 **`x-request-id`**（入站可继承 `traceparent` / `x-request-id`）。模板 `http_server` 在 **busy 树**（`PublicRouter` + RPC + `/docs`；**不含**探针）的 timeout 中间件预解析并回写，因此除 `/jsonrpc` 成功/失败/通知 ACK 外，timeout **408**、外层 body limit **413**、以及同树业务 HTTP 也会带该头。
+
+**相对旧版的破坏性变更：** 不再提供 `attach_trace_id`；错误体不再注入 `error.data.trace_id`；协议 `-32007` 的 `data` 为限额说明**字符串**（不再包成 `{detail,trace_id}` 对象）。
+
+Batch 请求传 JSON 数组即可；通知（无 `id`）HTTP 体为 JSON `null`（jsonrpsee ACK），不返回 Response 对象。
 
 ### PublicRouter / PrivateRouter / ProbeRouter / PublicRpc / PrivateRpc
 

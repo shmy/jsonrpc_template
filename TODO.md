@@ -28,7 +28,7 @@
 ## P3 — 可观测性
 
 - [x] RPC 级 tracing span：`method`、`id`、耗时、成功/错误码
-- [x] RPC 返回`trace_id`（仅错误）
+- [x] RPC 返回关联 id（响应头 `x-request-id`，成功/失败都回）
 - [x] 接入 `rootcause-tracing`
 - [x] 基础 metrics 钩子（`RpcObserver` + api feature `otlp`）
 

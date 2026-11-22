@@ -1,30 +1,49 @@
-//! Request-scoped trace id for JSON-RPC errors (`error.data.trace_id`).
+//! Request-scoped correlation id for JSON-RPC over HTTP.
 //!
-//! Header rules align with `trace_kit::extract_trace_id` (`traceparent` then
-//! `x-request-id`). Callers may supply a fallback (e.g. current OTel span id)
-//! before minting. Protocol crate stays free of OpenTelemetry.
+//! Inbound: `traceparent` → [`REQUEST_ID_HEADER`] → optional fallback → mint
+//! (aligned with `trace_kit::extract_trace_id`). Fallback strings are run through
+//! the same 32-hex normalize as headers (invalid → treat as missing → mint).
+//!
+//! Outbound: router echoes the resolved id on every `/jsonrpc` response as
+//! [`REQUEST_ID_HEADER`]. Apps can pre-resolve once (timeout / body-limit layers)
+//! via [`ResolvedRequestId`] in request extensions so mint stays stable.
+//! Protocol crate stays free of OpenTelemetry.
 
-use axum::http::HeaderMap;
-use serde_json::{Map, Value};
+use axum::http::{HeaderMap, HeaderName, HeaderValue};
+use axum::response::Response as HttpResponse;
 
-use super::types::ErrorObject;
+/// Response / request correlation header (`x-request-id`).
+pub const REQUEST_ID_HEADER: &str = "x-request-id";
+/// W3C Trace Context request header.
+pub const TRACEPARENT_HEADER: &str = "traceparent";
 
-const REQUEST_ID_HEADER: &str = "x-request-id";
-const TRACEPARENT_HEADER: &str = "traceparent";
+/// Pre-resolved correlation id stored in request extensions by an outer layer
+/// (e.g. timeout middleware) so `/jsonrpc` and transport errors share one mint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedRequestId(pub String);
 
-/// Resolve a 32-hex trace id: headers → `fallback` → mint.
+/// Resolve a 32-hex trace id: headers → normalized `fallback` → mint.
 pub fn resolve_trace_id_with_fallback(
     headers: &HeaderMap,
     fallback: impl FnOnce() -> Option<String>,
 ) -> String {
     extract_trace_id(headers)
-        .or_else(fallback)
+        .or_else(|| fallback().and_then(|id| normalize_trace_id(&id)))
         .unwrap_or_else(mint_trace_id)
 }
 
 /// Resolve from headers only, else mint (tests / callers without a span fallback).
 pub fn resolve_trace_id(headers: &HeaderMap) -> String {
     resolve_trace_id_with_fallback(headers, || None)
+}
+
+/// Set / overwrite [`REQUEST_ID_HEADER`] on an HTTP response (no-op if value is illegal).
+pub fn set_request_id_header(response: &mut HttpResponse, trace_id: &str) {
+    if let Ok(value) = HeaderValue::from_str(trace_id) {
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static(REQUEST_ID_HEADER), value);
+    }
 }
 
 fn extract_trace_id(headers: &HeaderMap) -> Option<String> {
@@ -92,56 +111,18 @@ fn mint_trace_id() -> String {
     })
 }
 
-/// Attach `trace_id` into `error.data` without dropping existing payload.
-pub fn attach_trace_id(error: &mut ErrorObject, trace_id: &str) {
-    let mut obj = match error.data.take() {
-        None => Map::new(),
-        Some(Value::Object(map)) => map,
-        Some(other) => {
-            let mut map = Map::new();
-            map.insert("detail".into(), other);
-            map
-        }
-    };
-    obj.insert("trace_id".into(), Value::String(trace_id.to_owned()));
-    error.data = Some(Value::Object(obj));
-}
-
-pub(crate) fn with_trace_id(mut error: ErrorObject, trace_id: &str) -> ErrorObject {
-    attach_trace_id(&mut error, trace_id);
-    error
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
     use axum::http::HeaderValue;
-    use serde_json::json;
 
     #[test]
     fn parse_traceparent_returns_pure_trace_id() {
         let traceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
         let parsed = parse_traceparent_trace_id(traceparent);
         assert_eq!(parsed.as_deref(), Some("4bf92f3577b34da6a3ce929d0e0e4736"));
-    }
-
-    #[test]
-    fn attach_trace_id_wraps_non_object_data() {
-        let mut err = ErrorObject {
-            code: -32007,
-            message: "Request is too big".into(),
-            data: Some(Value::String("Exceeded max limit of 1".into())),
-        };
-        attach_trace_id(&mut err, "4bf92f3577b34da6a3ce929d0e0e4736");
-        assert_eq!(
-            err.data,
-            Some(json!({
-                "detail": "Exceeded max limit of 1",
-                "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
-            }))
-        );
     }
 
     #[test]
@@ -177,6 +158,15 @@ mod tests {
             Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into())
         });
         assert_eq!(id, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    }
+
+    #[test]
+    fn invalid_fallback_is_ignored_then_mint() {
+        let id = resolve_trace_id_with_fallback(&HeaderMap::new(), || {
+            Some("not-a-valid-trace-id\n".into())
+        });
+        assert_eq!(id.len(), 32);
+        assert!(id.bytes().all(|b| b.is_ascii_hexdigit()));
     }
 
     #[test]

@@ -59,7 +59,10 @@ pub use params::{
 pub use router::{ReadyRpcRouter, RegisterError, RpcRouter, TraceIdFallback};
 pub use serde_json::value::RawValue;
 pub use standard_message::{StandardErrorKind, set_standard_error_message};
-pub use trace_id::{attach_trace_id, resolve_trace_id, resolve_trace_id_with_fallback};
+pub use trace_id::{
+    REQUEST_ID_HEADER, ResolvedRequestId, TRACEPARENT_HEADER, resolve_trace_id,
+    resolve_trace_id_with_fallback, set_request_id_header,
+};
 pub use types::{
     DEFAULT_BATCH_CONCURRENCY, ErrorObject, Id, MAX_BATCH_LEN, MAX_BODY_BYTES, Response,
     error_codes,

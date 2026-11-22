@@ -1,8 +1,9 @@
 //! CORS 白名单解析与外层 layer。
 
 use axum::Router;
-use axum::http::{HeaderValue, Method, Uri, header};
+use axum::http::{HeaderName, HeaderValue, Method, Uri, header};
 use axum::middleware::from_fn;
+use axum_jsonrpc::{REQUEST_ID_HEADER, TRACEPARENT_HEADER};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 /// Outer layers shared by probes + busy routes: locale (inner) → CORS (outer).
@@ -57,7 +58,11 @@ pub(crate) fn cors_layer(origins: &str) -> Option<CorsLayer> {
                 header::CONTENT_TYPE,
                 header::ACCEPT,
                 header::ACCEPT_LANGUAGE,
-            ]),
+                HeaderName::from_static(REQUEST_ID_HEADER),
+                HeaderName::from_static(TRACEPARENT_HEADER),
+            ])
+            // Browser clients need this to read correlation id on cross-origin responses.
+            .expose_headers([HeaderName::from_static(REQUEST_ID_HEADER)]),
     )
 }
 

@@ -25,6 +25,8 @@ where
 {
     router
         .observer(Arc::new(OtelRpcObserver))
-        // Empty headers → current OTel span (trace_kit `trace_id` via otlp feature).
+        // Busy-tree HTTP prefers `ResolvedRequestId` from timeout middleware.
+        // Keep this fallback for `/jsonrpc` mounted without that middleware
+        // (custom composition / direct `into_axum_rpc_router`).
         .trace_id_fallback(|| trace_kit::extract_trace_id(&HeaderMap::new()))
 }

@@ -16,9 +16,11 @@ use super::super::observer::RpcObserver;
 use super::super::params::{Params, ValidatedParams};
 use super::super::parse::{ParseCall, parse_call};
 use super::super::router::{DispatchOutcome, RegisterError, RpcRouter, is_json_content_type};
+use super::super::trace_id::ResolvedRequestId;
 use super::super::types::{ErrorObject, Id, MAX_BATCH_LEN, MAX_BODY_BYTES, Response, error_codes};
 use super::common::{
-    TEST_TRACE_ID, assert_single_error, parse_call_json, parts, raw_json, result_value,
+    KNOWN_TRACE_ID, TEST_TRACE_ID, assert_minted_request_id, assert_request_id,
+    assert_single_error, parse_call_json, parts, raw_json, result_value,
 };
 
 #[test]
@@ -73,6 +75,7 @@ async fn http_rejects_non_json_content_type() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert_minted_request_id(&response);
 }
 
 #[tokio::test]
@@ -231,16 +234,11 @@ async fn http_rpc_error_still_200() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+    assert_minted_request_id(&response);
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let v: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(v["error"]["code"], error_codes::METHOD_NOT_FOUND);
     assert!(v.get("result").is_none());
-    assert!(
-        v["error"]["data"]["trace_id"]
-            .as_str()
-            .is_some_and(|id| id.len() == 32),
-        "expected minted trace_id in error.data"
-    );
 }
 
 #[tokio::test]
@@ -286,12 +284,9 @@ async fn http_error_reuses_traceparent_trace_id() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+    assert_request_id(&response, KNOWN_TRACE_ID);
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let v: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(
-        v["error"]["data"]["trace_id"],
-        "4bf92f3577b34da6a3ce929d0e0e4736"
-    );
     assert!(v.get("result").is_none());
 }
 
@@ -304,18 +299,13 @@ async fn http_error_reuses_x_request_id() {
                 .method("POST")
                 .uri("/jsonrpc")
                 .header(CONTENT_TYPE, "application/json")
-                .header("x-request-id", "4bf92f3577b34da6a3ce929d0e0e4736")
+                .header("x-request-id", KNOWN_TRACE_ID)
                 .body(Body::from(r#"{"jsonrpc":"2.0","method":"missing","id":1}"#))
                 .unwrap(),
         )
         .await
         .unwrap();
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let v: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(
-        v["error"]["data"]["trace_id"],
-        "4bf92f3577b34da6a3ce929d0e0e4736"
-    );
+    assert_request_id(&response, KNOWN_TRACE_ID);
 }
 
 #[tokio::test]
@@ -341,15 +331,12 @@ async fn http_oversized_body_error_includes_traceparent() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_request_id(&response, KNOWN_TRACE_ID);
     let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let v: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(v["error"]["code"], error_codes::OVERSIZED_REQUEST);
     assert_eq!(
-        v["error"]["data"]["trace_id"],
-        "4bf92f3577b34da6a3ce929d0e0e4736"
-    );
-    assert_eq!(
-        v["error"]["data"]["detail"],
+        v["error"]["data"],
         format!("Exceeded max limit of {MAX_BODY_BYTES}")
     );
 }
@@ -370,12 +357,7 @@ async fn http_error_uses_trace_id_fallback_before_mint() {
         )
         .await
         .unwrap();
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let v: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(
-        v["error"]["data"]["trace_id"],
-        "cccccccccccccccccccccccccccccccc"
-    );
+    assert_request_id(&response, "cccccccccccccccccccccccccccccccc");
 }
 
 #[tokio::test]
@@ -428,7 +410,36 @@ async fn observer_sees_calls_and_batch_size() {
 }
 
 #[tokio::test]
-async fn http_success_has_no_error_data_trace_id() {
+async fn http_success_echoes_x_request_id_header() {
+    async fn ping() -> Result<&'static str, ErrorObject> {
+        Ok("pong")
+    }
+
+    let app = RpcRouter::<()>::new()
+        .method("ping", ping)
+        .expect("register")
+        .into_axum_rpc_router();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/jsonrpc")
+                .header(CONTENT_TYPE, "application/json")
+                .header("x-request-id", KNOWN_TRACE_ID)
+                .body(Body::from(r#"{"jsonrpc":"2.0","method":"ping","id":1}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_request_id(&response, KNOWN_TRACE_ID);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let v: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(v["result"], "pong");
+    assert!(v.get("error").is_none());
+}
+
+#[tokio::test]
+async fn http_success_mints_request_id_without_inbound() {
     async fn ping() -> Result<&'static str, ErrorObject> {
         Ok("pong")
     }
@@ -448,9 +459,30 @@ async fn http_success_has_no_error_data_trace_id() {
         )
         .await
         .unwrap();
-    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let v: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(v["result"], "pong");
-    assert!(v.get("error").is_none());
-    assert!(v.get("trace_id").is_none());
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_minted_request_id(&response);
+}
+
+#[tokio::test]
+async fn http_prefers_resolved_request_id_extension() {
+    async fn ping() -> Result<&'static str, ErrorObject> {
+        Ok("pong")
+    }
+
+    let app = RpcRouter::<()>::new()
+        .method("ping", ping)
+        .expect("register")
+        .into_axum_rpc_router();
+    let mut req = Request::builder()
+        .method("POST")
+        .uri("/jsonrpc")
+        .header(CONTENT_TYPE, "application/json")
+        .header("x-request-id", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        .body(Body::from(r#"{"jsonrpc":"2.0","method":"ping","id":1}"#))
+        .unwrap();
+    req.extensions_mut()
+        .insert(ResolvedRequestId(KNOWN_TRACE_ID.to_owned()));
+
+    let response = app.oneshot(req).await.unwrap();
+    assert_request_id(&response, KNOWN_TRACE_ID);
 }

@@ -9,12 +9,16 @@ use app_state::{AppState, AuthRateLimit, LoginPhoneRate, SlidingWindowRate};
 use axum::Router;
 use axum::extract::State;
 use axum::extract::{DefaultBodyLimit, Request};
+use axum::http::HeaderMap;
 use axum::http::StatusCode;
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing::get;
-use axum_jsonrpc::{ReadyRpcRouter, StandardErrorKind};
+use axum_jsonrpc::{
+    ReadyRpcRouter, ResolvedRequestId, StandardErrorKind, resolve_trace_id_with_fallback,
+    set_request_id_header,
+};
 use axum_jsonrpc_openrpc::{OpenRpcInfo, OpenRpcServer, RpcRouterOpenRpcExt};
 use blob_kit::Blob;
 use cache_kit::Cache;
@@ -274,19 +278,175 @@ fn build_app(
 
 async fn request_timeout_middleware(
     State(timeout): State<Duration>,
-    req: Request,
+    mut req: Request,
     next: Next,
 ) -> Response {
+    // Resolve once before handler / DefaultBodyLimit so 408 and outer 413 share
+    // the same mint as `/jsonrpc` (via ResolvedRequestId extension).
+    let trace_id = resolve_busy_trace_id(req.headers());
+    req.extensions_mut()
+        .insert(ResolvedRequestId(trace_id.clone()));
+
     // NOTE: on timeout the in-flight handler future is *dropped* (same semantics as
     // tower_http TimeoutLayer). Multi-step cache writes (e.g. issue_tokens) can be
     // cut mid-flight, leaving the documented half-open session window; the next
     // login/refresh overwrites the subject pointer. 60 s default makes this rare.
-    match time::timeout(timeout, next.run(req)).await {
+    let mut response = match time::timeout(timeout, next.run(req)).await {
         Ok(response) => response,
         Err(_) => (
             StatusCode::REQUEST_TIMEOUT,
             locale::translate_current("request_timeout"),
         )
             .into_response(),
+    };
+    set_request_id_header(&mut response, &trace_id);
+    response
+}
+
+fn resolve_busy_trace_id(headers: &HeaderMap) -> String {
+    resolve_trace_id_with_fallback(headers, || {
+        #[cfg(feature = "otel")]
+        {
+            // Empty map → current OTel span (layer is outside this middleware).
+            trace_kit::extract_trace_id(&http_1::HeaderMap::new())
+        }
+        #[cfg(not(feature = "otel"))]
+        {
+            None
+        }
+    })
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod request_id_middleware_tests {
+    use std::time::Duration;
+
+    use axum::Router;
+    use axum::body::{Body, to_bytes};
+    use axum::extract::{DefaultBodyLimit, Request};
+    use axum::http::{StatusCode, header::CONTENT_TYPE};
+    use axum::middleware::from_fn_with_state;
+    use axum::routing::post;
+    use axum_jsonrpc::REQUEST_ID_HEADER;
+    use tower::ServiceExt;
+
+    use super::request_timeout_middleware;
+    use axum::response;
+    use tokio::time::sleep;
+
+    fn assert_request_id_hex(response: &response::Response) {
+        let id = response
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .and_then(|v| v.to_str().ok());
+        assert!(
+            id.is_some_and(|id| id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit())),
+            "expected 32-hex {REQUEST_ID_HEADER}, got {id:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn timeout_408_includes_x_request_id() {
+        let app = Router::new()
+            .route(
+                "/jsonrpc",
+                post(|| async {
+                    sleep(Duration::from_secs(5)).await;
+                    "ok"
+                }),
+            )
+            .layer(from_fn_with_state(
+                Duration::from_millis(20),
+                request_timeout_middleware,
+            ));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/jsonrpc")
+                    .header(CONTENT_TYPE, "application/json")
+                    .header(REQUEST_ID_HEADER, "4bf92f3577b34da6a3ce929d0e0e4736")
+                    .body(Body::from("{}"))
+                    .expect("request"),
+            )
+            .await
+            .expect("oneshot");
+
+        assert_eq!(response.status(), StatusCode::REQUEST_TIMEOUT);
+        assert_eq!(
+            response
+                .headers()
+                .get(REQUEST_ID_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("4bf92f3577b34da6a3ce929d0e0e4736")
+        );
+    }
+
+    #[tokio::test]
+    async fn outer_body_limit_413_includes_x_request_id() {
+        // DefaultBodyLimit is enforced when an extractor reads the body.
+        let app = Router::new()
+            .route(
+                "/jsonrpc",
+                post(|body: String| async move { format!("len={}", body.len()) }),
+            )
+            .layer(DefaultBodyLimit::max(8))
+            .layer(from_fn_with_state(
+                Duration::from_secs(5),
+                request_timeout_middleware,
+            ));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/jsonrpc")
+                    .header(CONTENT_TYPE, "application/json")
+                    .header(REQUEST_ID_HEADER, "4bf92f3577b34da6a3ce929d0e0e4736")
+                    .body(Body::from(vec![b'x'; 64]))
+                    .expect("request"),
+            )
+            .await
+            .expect("oneshot");
+
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_eq!(
+            response
+                .headers()
+                .get(REQUEST_ID_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("4bf92f3577b34da6a3ce929d0e0e4736")
+        );
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        assert!(!body.starts_with(b"len="));
+    }
+
+    #[tokio::test]
+    async fn success_mints_x_request_id_without_inbound() {
+        let app = Router::new()
+            .route("/jsonrpc", post(|| async { "ok" }))
+            .layer(from_fn_with_state(
+                Duration::from_secs(5),
+                request_timeout_middleware,
+            ));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/jsonrpc")
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(Body::from("{}"))
+                    .expect("request"),
+            )
+            .await
+            .expect("oneshot");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_request_id_hex(&response);
     }
 }

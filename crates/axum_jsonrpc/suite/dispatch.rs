@@ -113,13 +113,6 @@ async fn dispatch_success_and_invalid_params() {
     );
     let err = resp.error.expect("error");
     assert_eq!(err.message, "Invalid params");
-    assert_eq!(
-        err.data
-            .as_ref()
-            .and_then(|d| d.get("trace_id"))
-            .and_then(Value::as_str),
-        Some(TEST_TRACE_ID)
-    );
 }
 
 #[tokio::test]

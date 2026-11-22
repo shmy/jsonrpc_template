@@ -19,6 +19,7 @@ HTTP 200
 admin_token: jsonpath "$.result.access_token"
 [Asserts]
 jsonpath "$.error" not exists
+header "x-request-id" matches /^[0-9a-f]{32}$/
 
 # create（任意登录即可；结果恒 privileged=false；此处用 seed token 起步）
 POST {{base_url}}/jsonrpc

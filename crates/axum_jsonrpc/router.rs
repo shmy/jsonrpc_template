@@ -10,7 +10,7 @@ use axum::Router as AxumRouter;
 use axum::body::{Body, to_bytes};
 use axum::extract::Request;
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response as HttpResponse};
 use axum::routing::post;
 use futures_util::stream::{self, StreamExt};
@@ -24,7 +24,7 @@ use super::meta::{MethodMeta, MethodSpec, Registrable};
 use super::observer::{RpcObserver, SharedObserver, default_observer};
 use super::params::RpcParams;
 use super::parse::{ParseCall, TopCall, parse_call, parse_top, validate_call};
-use super::trace_id::{attach_trace_id, resolve_trace_id_with_fallback, with_trace_id};
+use super::trace_id::{ResolvedRequestId, resolve_trace_id_with_fallback, set_request_id_header};
 use super::types::{
     Call, DEFAULT_BATCH_CONCURRENCY, ErrorObject, Id, MAX_BATCH_LEN, MAX_BODY_BYTES, Response,
 };
@@ -349,28 +349,33 @@ where
     }
 
     async fn handle_http(&self, req: Request) -> HttpResponse {
-        if !is_json_content_type(req.headers().get(header::CONTENT_TYPE)) {
+        // Prefer outer-layer [`ResolvedRequestId`] (timeout / body-limit) so mint
+        // matches transport errors; otherwise resolve once here.
+        let (parts, body) = req.into_parts();
+        let trace_id = self.resolve_trace_id_for_parts(&parts);
+
+        if !is_json_content_type(parts.headers.get(header::CONTENT_TYPE)) {
             // jsonrpsee: 415 + plain text.
-            return (
-                StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                "Supplied content type is not allowed. Content-Type: application/json is required\n",
-            )
-                .into_response();
+            return with_request_id(
+                (
+                    StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                    "Supplied content type is not allowed. Content-Type: application/json is required\n",
+                )
+                    .into_response(),
+                &trace_id,
+            );
         }
 
         // Span name after parse (`otel.name` can't be renamed post-enter).
-        // Resolve trace_id inside the span so it matches the OTel id.
-        let (parts, body) = req.into_parts();
         let max_body = self.max_body_bytes;
         let bytes = match to_bytes(body, max_body).await {
             Ok(bytes) => bytes,
             Err(err) if is_length_limit_error(&err) => {
                 return self
-                    .http_error(&parts.headers, 0, |tid| {
-                        traced_rpc_error(
+                    .http_error(&trace_id, 0, || {
+                        rpc_error_response(
                             StatusCode::PAYLOAD_TOO_LARGE,
                             ErrorObject::oversized_request(max_body),
-                            tid,
                         )
                     })
                     .await;
@@ -378,8 +383,8 @@ where
             Err(err) => {
                 debug!(error = %err, "failed to read jsonrpc body");
                 return self
-                    .http_error(&parts.headers, 0, |tid| {
-                        traced_rpc_error(StatusCode::BAD_REQUEST, ErrorObject::parse_error(), tid)
+                    .http_error(&trace_id, 0, || {
+                        rpc_error_response(StatusCode::BAD_REQUEST, ErrorObject::parse_error())
                     })
                     .await;
             }
@@ -389,12 +394,8 @@ where
             Ok(top) => top,
             Err(()) => {
                 return self
-                    .http_error(&parts.headers, bytes.len(), |tid| {
-                        DispatchOutcome::Single(Response::error(
-                            Id::Null,
-                            with_trace_id(ErrorObject::parse_error(), tid),
-                        ))
-                        .into_response()
+                    .http_error(&trace_id, bytes.len(), || {
+                        rpc_error_response(StatusCode::OK, ErrorObject::parse_error())
                     })
                     .await;
             }
@@ -402,31 +403,38 @@ where
 
         let span = root_span(&top, bytes.len());
         async move {
-            let trace_id = self.resolve_trace_id(&parts.headers);
             Span::current().record("rpc.trace_id", display(&trace_id));
             // Single: this span is the method span. Batch: nested per-call spans.
-            self.dispatch(parts, top, &trace_id, false)
-                .await
-                .into_response()
+            with_request_id(
+                self.dispatch(parts, top, &trace_id, false)
+                    .await
+                    .into_response(),
+                &trace_id,
+            )
         }
         .instrument(span)
         .await
     }
 
-    fn resolve_trace_id(&self, headers: &HeaderMap) -> String {
-        resolve_trace_id_with_fallback(headers, || {
+    fn resolve_trace_id_for_parts(&self, parts: &Parts) -> String {
+        if let Some(ResolvedRequestId(id)) = parts.extensions.get::<ResolvedRequestId>() {
+            return id.clone();
+        }
+        resolve_trace_id_with_fallback(&parts.headers, || {
             self.trace_id_fallback.as_ref().and_then(|f| f())
         })
     }
 
     async fn http_error(
         &self,
-        headers: &HeaderMap,
+        trace_id: &str,
         body_bytes: usize,
-        make: impl FnOnce(&str) -> HttpResponse,
+        make: impl FnOnce() -> HttpResponse,
     ) -> HttpResponse {
-        let trace_id = self.resolve_trace_id(headers);
-        with_http_span(&trace_id, body_bytes, async { make(&trace_id) }).await
+        with_http_span(trace_id, body_bytes, async {
+            with_request_id(make(), trace_id)
+        })
+        .await
     }
 
     #[cfg(test)]
@@ -438,10 +446,9 @@ where
     ) -> DispatchOutcome {
         match parse_top(bytes) {
             Ok(top) => self.dispatch(parts, top, trace_id, true).await,
-            Err(()) => DispatchOutcome::Single(Response::error(
-                Id::Null,
-                with_trace_id(ErrorObject::parse_error(), trace_id),
-            )),
+            Err(()) => {
+                DispatchOutcome::Single(Response::error(Id::Null, ErrorObject::parse_error()))
+            }
         }
     }
 
@@ -484,17 +491,14 @@ where
         if items.is_empty() {
             return DispatchOutcome::Single(Response::error(
                 Id::Null,
-                with_trace_id(ErrorObject::invalid_request(), trace_id),
+                ErrorObject::invalid_request(),
             ));
         }
         if items.len() > self.max_batch_len {
             // jsonrpsee uses implementation-defined -32010 (not -32600).
             return DispatchOutcome::Single(Response::error(
                 Id::Null,
-                with_trace_id(
-                    ErrorObject::too_big_batch_request(self.max_batch_len),
-                    trace_id,
-                ),
+                ErrorObject::too_big_batch_request(self.max_batch_len),
             ));
         }
 
@@ -538,7 +542,7 @@ where
         match parsed {
             ParseCall::Invalid { id, error } => {
                 mark_rpc_error(&error);
-                Some(Response::error(id, with_trace_id(error, trace_id)))
+                Some(Response::error(id, error))
             }
             ParseCall::Dropped => None,
             ParseCall::Notification(call) => {
@@ -570,7 +574,7 @@ where
                         }
                         Err(error) => {
                             self.finish_call(&method, Some(&error), started);
-                            Some(Response::error(id, with_trace_id(error, trace_id)))
+                            Some(Response::error(id, error))
                         }
                     }
                 };
@@ -709,14 +713,6 @@ fn mark_rpc_error(error: &ErrorObject) {
     );
 }
 
-fn traced_rpc_error(status: StatusCode, error: ErrorObject, trace_id: &str) -> HttpResponse {
-    rpc_status_response(
-        status,
-        &Response::error(Id::Null, with_trace_id(error, trace_id)),
-        Some(trace_id),
-    )
-}
-
 #[derive(Debug)]
 pub(crate) enum DispatchOutcome {
     Empty,
@@ -735,10 +731,16 @@ impl IntoResponse for DispatchOutcome {
                 Body::from("null"),
             )
                 .into_response(),
-            Self::Single(response) => json_response(&response),
-            Self::Batch(responses) => json_response(&responses),
+            Self::Single(response) => rpc_status_response(StatusCode::OK, &response),
+            Self::Batch(responses) => rpc_status_response(StatusCode::OK, &responses),
         }
     }
+}
+
+/// Echo the resolved correlation id on every `/jsonrpc` HTTP response.
+fn with_request_id(mut response: HttpResponse, trace_id: &str) -> HttpResponse {
+    set_request_id_header(&mut response, trace_id);
+    response
 }
 
 /// Response `Content-Type` used by jsonrpsee HTTP.
@@ -779,29 +781,24 @@ fn is_length_limit_error(err: &axum::Error) -> bool {
         .unwrap_or(false)
 }
 
-fn json_response(body: &impl serde::Serialize) -> HttpResponse {
-    rpc_status_response(StatusCode::OK, body, None)
+fn rpc_error_response(status: StatusCode, error: ErrorObject) -> HttpResponse {
+    rpc_status_response(status, &Response::error(Id::Null, error))
 }
 
-fn rpc_status_response(
-    status: StatusCode,
-    body: &impl serde::Serialize,
-    fallback_trace_id: Option<&str>,
-) -> HttpResponse {
+fn rpc_status_response(status: StatusCode, body: &impl serde::Serialize) -> HttpResponse {
     match serde_json::to_vec(body) {
         Ok(bytes) => (status, [(header::CONTENT_TYPE, JSON_CONTENT_TYPE)], bytes).into_response(),
         Err(_) => {
             // Prefer the same localized -32603 path as handlers; last resort is ASCII-only.
-            let mut error = ErrorObject::internal_error();
-            if let Some(trace_id) = fallback_trace_id {
-                attach_trace_id(&mut error, trace_id);
-            }
-            let payload = serde_json::to_vec(&Response::error(Id::Null, error)).unwrap_or_else(
-                |_| {
-                    br#"{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}"#
-                        .to_vec()
-                },
-            );
+            // Correlation id is on `x-request-id` (set by caller via `with_request_id`).
+            let payload = serde_json::to_vec(&Response::error(
+                Id::Null,
+                ErrorObject::internal_error(),
+            ))
+            .unwrap_or_else(|_| {
+                br#"{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}"#
+                    .to_vec()
+            });
             (status, [(header::CONTENT_TYPE, JSON_CONTENT_TYPE)], payload).into_response()
         }
     }

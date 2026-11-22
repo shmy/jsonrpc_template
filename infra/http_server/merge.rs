@@ -53,6 +53,7 @@ pub(crate) fn merge_rpc(
     {
         // 顺序契约：必须在所有 merge **之前**装 observer / trace_id_fallback——
         // merge 保留 self 侧的两者，merge 之后再装不会作用于已合入的 fragment。
+        // Busy 树 HTTP 优先 timeout 中间件的 ResolvedRequestId；fallback 留给无该中间件的挂载方式。
         merged = crate::otel::instrument_router(merged);
     }
     for PublicRpc(router) in public {
