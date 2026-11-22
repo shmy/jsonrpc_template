@@ -14,9 +14,15 @@ use super::types::{Call, ErrorObject, Id, Response};
 
 #[derive(Debug)]
 pub(crate) enum ParseCall {
-    Invalid { id: Id, error: ErrorObject },
+    Invalid {
+        id: Id,
+        error: ErrorObject,
+    },
     Notification(Call),
-    Request { call: Call, id: Id },
+    Request {
+        call: Call,
+        id: Id,
+    },
     /// Spec §4.1: notification envelope (valid `jsonrpc`+`method`, omitted `id`)
     /// with illegal `params` shape — must not reply and must not invoke.
     Dropped,
