@@ -256,6 +256,19 @@ impl Blob {
         }
     }
 
+    /// 对象是否存在（轻量；不拉内容）。不安全 path → [`BlobError::UnsafeObjectPath`]。
+    #[tracing::instrument]
+    pub async fn exists(&self, path: &str) -> Result<bool> {
+        match self {
+            #[cfg(feature = "cos")]
+            Self::Cos(b) => b.exists(path).await,
+            #[cfg(feature = "fs")]
+            Self::Fs(b) => b.exists(path).await,
+            #[cfg(feature = "test-utils")]
+            Self::Test(b) => b.exists(path).await,
+        }
+    }
+
     /// 预签名直传 URL（Cos 原生 / Fs 本地 HMAC PUT；test 后端 unsupported）。
     #[tracing::instrument]
     pub async fn presign_upload_url(
@@ -300,6 +313,28 @@ mod tests {
     use std::io::Write;
     use tempfile::NamedTempFile;
     use tokio::fs::File as TokioFile;
+
+    #[tokio::test]
+    async fn write_rejects_unsafe_path() {
+        let blob = Blob::new_for_test().await.expect("create test blob");
+        let err = blob
+            .write("../escape.txt", Cursor::new(b"x"))
+            .await
+            .expect_err("reject");
+        assert!(
+            err.downcast_current_context::<BlobError>()
+                .is_some_and(|e| matches!(e, BlobError::UnsafeObjectPath))
+        );
+    }
+
+    #[tokio::test]
+    async fn exists_roundtrip() {
+        let blob = Blob::new_for_test().await.expect("create test blob");
+        let path = "staging/exists.txt";
+        assert!(!blob.exists(path).await.unwrap());
+        blob.write(path, Cursor::new(b"ok")).await.unwrap();
+        assert!(blob.exists(path).await.unwrap());
+    }
 
     #[tokio::test]
     async fn facade_roundtrip() {

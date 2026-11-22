@@ -159,7 +159,11 @@ impl BackendCore {
         path: impl AsRef<str> + Debug,
         mut stream: impl Stream<Item = Result<ReaderStream<File>>> + Unpin,
     ) -> Result<u64> {
-        let writer = self.op.writer_with(path.as_ref()).concurrent(8).await?;
+        let path = path.as_ref();
+        if !is_safe_object_path(path) {
+            return Err(BlobError::UnsafeObjectPath.into());
+        }
+        let writer = self.op.writer_with(path).concurrent(8).await?;
         let mut sink = writer.into_bytes_sink();
         let mut total_size: u64 = 0;
 
@@ -186,11 +190,24 @@ impl BackendCore {
         path: impl AsRef<str> + Debug,
         mut reader: impl Read + Seek,
     ) -> Result<u64> {
+        let path = path.as_ref();
+        if !is_safe_object_path(path) {
+            return Err(BlobError::UnsafeObjectPath.into());
+        }
         let mut buf = Vec::new();
         reader.read_to_end(&mut buf)?;
         let total_size = buf.len() as u64;
-        let _ = self.op.write(path.as_ref(), buf).await?;
+        let _ = self.op.write(path, buf).await?;
         Ok(total_size)
+    }
+
+    /// 对象是否存在（`stat`/`exists`；不拉内容）。
+    #[tracing::instrument(skip(self))]
+    pub(crate) async fn exists(&self, path: &str) -> Result<bool> {
+        if !is_safe_object_path(path) {
+            return Err(BlobError::UnsafeObjectPath.into());
+        }
+        Ok(self.op.exists(path).await?)
     }
 
     /// 批量删除（空列表安全）。

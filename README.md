@@ -177,18 +177,20 @@ crates/
   axum_jsonrpc_openrpc  # OpenRPC 文档生成与 /openrpc.json
   blob_kit              # OpenDAL 对象存储门面（fs / 腾讯 COS）
   cache_kit             # Redis Cache 门面
+  image_kit             # 缩略图派生（decode → webp；供 job worker）
   jwt_kit               # HS256 TokenHelper
   trace_kit             # tracing 初始化 / trace_id / OTLP metrics
 features/
   file                  # file.presign +（fs）本地 PUT/回源 + Lifecycle GC（仅 master）
-  file_contract         # BlobObject 模型与 FileError（-32032..）
+  file_contract         # BlobObject / FileError / thumb_object_path 约定
   identity              # 示范业务：account CRUD + login/refresh/logout（avatar 经 file_attachment）
   identity_contract     # Account 模型与领域错误
   probe                 # 运维 HTTP：/livez、/healthz、/readyz（ProbeRouter）
 infra/
   app_state             # AppState（Db + Cache + Blob + TokenHelper + …）
   blob                  # OpenDAL Operator provide（feature：fs / cos）
-  file_attachment       # staging claim / commit / attach / detach
+  file_attachment       # staging claim / commit / attach / detach；commit 后入队缩略图
+  job_queue             # apalis + Redis（缩略图 worker；不限 MASTER）
   cache                 # Redis 连接池 provide
   config                # Cli / dotenv / TrustedProxies
   http_auth             # Bearer、软/强制鉴权、AuthedAccount

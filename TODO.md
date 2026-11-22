@@ -50,7 +50,8 @@
 - WebSocket / 订阅（除非产品需要）
 - 规范 introspection（`rpc.discover` 等）——已有 OpenRPC 可替代
 - TLS 终止（默认交给反向代理）
-- job_queue / scheduler（file 的 staging/attachment GC 已用 Lifecycle 间隔任务）、多 cache 后端、双组合根
+- 多 cache 后端、双组合根（独立 worker 二进制）；缩略图多尺寸 / thumb 就绪探测
+- （已落地）`infra/job_queue`（apalis+Redis）+ 图片缩略图 job；file GC 仍用 Lifecycle+MASTER
 - MFA / 多设备会话 / OIDC
 - 常见/breached 密码 denylist
 - 账号软删 / 独立审计事件表
@@ -61,6 +62,8 @@
 - [x] `blob_kit` + `infra/blob`（fs / 腾讯 COS）；上传仅 `file.presign`
 - [x] （fs）`PUT /files/presigned` + `ServeDir` 公有读
 - [x] `infra/file_attachment` + identity avatar + Lifecycle GC
+- [x] `infra/job_queue`（apalis+Redis）+ `image_kit` 缩略图（commit 后台入队；`*_sm.webp`；显示端 fallback；IO 耗尽 → Redis DLQ）
+- [ ] 缩略图 DLQ 补扫 / 运维重放（当前仅落 `job:dlq:image_thumb`，无自动 reconcile）
 - [x] 多语言客户端生成 + CI `clients-check`（OpenRPC 漂移 + bun session.test）
 
 ## 验收标准（起步可用）

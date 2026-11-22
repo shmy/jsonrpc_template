@@ -8,12 +8,12 @@
 use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
 use blob_kit::{Blob, BlobError, is_staging_object_path, resolve_staging_move_paths};
 use cache_kit::Cache;
-use file_contract::FileError;
+use file_contract::{FileError, thumb_object_path};
 use identity_contract::Id;
 use rootcause::Result;
 use toasty::sql::query;
@@ -68,6 +68,54 @@ pub async fn collect_all_in_use(db: &mut Db) -> Result<HashSet<String>> {
 #[cfg(test)]
 fn clear_attachment_in_use_collectors_for_test() {
     in_use_lock().clear();
+}
+
+/// 缩略图入队 future（由 `job_queue` 在 module 启动时注册）。
+pub type ImageThumbnailEnqueueFuture = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
+
+/// 进程级缩略图入队器。
+pub type ImageThumbnailEnqueuer = Arc<dyn Fn(String) -> ImageThumbnailEnqueueFuture + Send + Sync>;
+
+static IMAGE_THUMB_ENQUEUER: OnceLock<ImageThumbnailEnqueuer> = OnceLock::new();
+
+/// 注册缩略图入队实现（`job_queue::module()` 内调用；仅首次生效）。
+pub fn register_image_thumbnail_enqueuer(enqueuer: ImageThumbnailEnqueuer) {
+    if IMAGE_THUMB_ENQUEUER.set(enqueuer).is_err() {
+        tracing::warn!("image thumbnail enqueuer already registered; ignoring duplicate set");
+    }
+}
+
+/// commit 成功后尽力入队生成缩略图；未注册 / 非图片只 skip。
+///
+/// `job_queue` 注册器同步 `try_acquire` + `spawn`（`ready(Ok)`，不进 Redis）；
+/// push / inflight 满的失败在 job_queue 内计数 + warn。
+pub async fn enqueue_image_thumbnail_best_effort(formal_path: &str) {
+    let Some(_) = thumb_object_path(formal_path) else {
+        return;
+    };
+    let Some(enqueuer) = IMAGE_THUMB_ENQUEUER.get() else {
+        tracing::debug!(
+            path = formal_path,
+            "image thumbnail enqueuer not registered; skip"
+        );
+        return;
+    };
+    // 默认实现恒 Ok；保留 Err 分支供自定义 enqueuer。
+    if let Err(err) = enqueuer(formal_path.to_string()).await {
+        tracing::warn!(
+            error = %err,
+            path = formal_path,
+            "image thumbnail enqueuer returned error; display may fallback to original"
+        );
+    }
+}
+
+/// 由正式 path / 本站 fill_url 派生缩略图公网 URL（文件可能尚未生成）。
+#[must_use]
+pub fn thumb_public_url(blob: &Blob, formal_or_url: &str) -> Option<String> {
+    let stripped = blob.strip_public_url_prefix(formal_or_url.trim());
+    let thumb = thumb_object_path(stripped.as_ref())?;
+    Some(blob.fill_public_url(&thumb).into_owned())
 }
 
 /// pending commit（refcount=0 且未 tombstone）超过此时长可被 AttachmentGc 回收。
@@ -154,6 +202,7 @@ pub async fn commit_staging(
         restore_staging_claim(cache, &from, actor_id).await;
         return Err(map_blob_report(err));
     }
+    enqueue_image_thumbnail_best_effort(&path).await;
     Ok(path)
 }
 
@@ -298,9 +347,13 @@ pub async fn list_gc_candidates(db: &mut dyn Executor) -> Result<Vec<String>> {
     Ok(out)
 }
 
-/// 删除 blob 并移除登记行（Gc 用）。
+/// 删除 blob（含约定缩略图）并移除登记行（Gc 用）。
 pub async fn purge_object(db: &mut dyn Executor, blob: &Blob, path: &str) -> Result<()> {
-    if let Err(err) = blob.delete_many(vec![path.to_string()]).await {
+    let mut keys = vec![path.to_string()];
+    if let Some(thumb) = thumb_object_path(path) {
+        keys.push(thumb);
+    }
+    if let Err(err) = blob.delete_many(keys).await {
         tracing::warn!(error = %err, path, "attachment gc: blob delete failed");
         return Err(err);
     }
@@ -338,5 +391,22 @@ mod tests {
         // fail-closed 门槛：file attachment_gc 在 count==0 时跳过 purge
         clear_attachment_in_use_collectors_for_test();
         assert_eq!(attachment_in_use_collector_count(), 0);
+    }
+
+    #[test]
+    fn purge_keys_include_derived_thumb() {
+        let path = "2026/01/abc.jpg";
+        let mut keys = vec![path.to_string()];
+        if let Some(thumb) = thumb_object_path(path) {
+            keys.push(thumb);
+        }
+        assert_eq!(
+            keys,
+            vec![
+                "2026/01/abc.jpg".to_string(),
+                "2026/01/abc_sm.webp".to_string()
+            ]
+        );
+        assert!(thumb_object_path("2026/01/clip.mp4").is_none());
     }
 }

@@ -1,0 +1,20 @@
+[package]
+name = "image_kit"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+fast_image_resize = { workspace = true }
+image = { workspace = true }
+thiserror = { workspace = true }
+webp = { workspace = true }
+
+[dev-dependencies]
+crc32fast = { workspace = true }

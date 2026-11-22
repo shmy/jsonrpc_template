@@ -110,6 +110,11 @@ impl TestBlob {
     }
 
     #[tracing::instrument]
+    pub async fn exists(&self, path: &str) -> Result<bool> {
+        self.core.exists(path).await
+    }
+
+    #[tracing::instrument]
     pub async fn presign_upload_url(
         &self,
         _path: impl AsRef<str> + Debug,

@@ -37,7 +37,7 @@ mod endpoints;
 mod methods;
 mod shared;
 
-/// GC 周期（无 job_queue；仅 `MASTER=true` 挂 Lifecycle 间隔任务）。
+/// GC 周期（仅 `MASTER=true` 挂 Lifecycle 间隔任务；缩略图走 `job_queue`/apalis）。
 const GC_INTERVAL: Duration = Duration::from_secs(3600);
 
 pub fn module() -> Module {

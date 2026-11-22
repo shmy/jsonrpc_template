@@ -33,6 +33,9 @@ pub struct Cli {
     pub rate_limit: RateLimitCli,
 
     #[command(flatten)]
+    pub job: JobCli,
+
+    #[command(flatten)]
     pub seed: SeedCli,
 }
 
@@ -300,6 +303,76 @@ pub struct CacheCli {
 }
 
 #[derive(Clone, Debug, clap::Args)]
+pub struct JobCli {
+    /// apalis 队列 Redis URL；空则回退 [`CacheCli::cache_redis_url`]。
+    #[arg(
+        id = "job_redis_url",
+        long = "job-redis-url",
+        env = "JOB_REDIS_URL",
+        default_value = ""
+    )]
+    pub job_redis_url: String,
+
+    /// 缩略图 worker 并发（CPU 型；默认 2）。
+    #[arg(
+        id = "job_thumb_concurrency",
+        long = "job-thumb-concurrency",
+        env = "JOB_THUMB_CONCURRENCY",
+        default_value = "2"
+    )]
+    pub thumb_concurrency: usize,
+
+    /// 缩略图任务最大尝试次数（含首次）。
+    #[arg(
+        id = "job_thumb_max_attempts",
+        long = "job-thumb-max-attempts",
+        env = "JOB_THUMB_MAX_ATTEMPTS",
+        default_value = "5"
+    )]
+    pub thumb_max_attempts: usize,
+
+    /// commit 后后台入队的最大并发（防突发 spawn 打满 runtime；默认 64）。
+    #[arg(
+        id = "job_thumb_enqueue_inflight",
+        long = "job-thumb-enqueue-inflight",
+        env = "JOB_THUMB_ENQUEUE_INFLIGHT",
+        default_value = "64"
+    )]
+    pub thumb_enqueue_inflight: usize,
+
+    /// Worker 心跳间隔（与 [`Self::missed_heartbeats`] 相乘 ≈ 孤儿任务回收窗口；默认 `10s`）。
+    #[arg(
+        id = "job_heartbeat_interval",
+        long = "job-heartbeat-interval",
+        env = "JOB_HEARTBEAT_INTERVAL",
+        default_value = "10s"
+    )]
+    pub heartbeat_interval: ReadableDuration,
+
+    /// 连续错过心跳次数后视为 worker 死亡并 reenqueue orphan（默认 3 → 约 30s）。
+    #[arg(
+        id = "job_missed_heartbeats",
+        long = "job-missed-heartbeats",
+        env = "JOB_MISSED_HEARTBEATS",
+        default_value = "3"
+    )]
+    pub missed_heartbeats: usize,
+}
+
+impl JobCli {
+    /// 解析队列用 Redis URL（空 `JOB_REDIS_URL` → cache Redis）。
+    #[must_use]
+    pub fn redis_url<'a>(&'a self, cache: &'a CacheCli) -> &'a str {
+        let trimmed = self.job_redis_url.trim();
+        if trimmed.is_empty() {
+            cache.cache_redis_url.as_str()
+        } else {
+            trimmed
+        }
+    }
+}
+
+#[derive(Clone, Debug, clap::Args)]
 pub struct BlobCli {
     /// 本地落盘根目录（feature `blob-fs` / `config/fs`；默认 `data/blob`）。
     #[cfg(feature = "fs")]
@@ -464,6 +537,21 @@ impl Cli {
         }
         if self.rate_limit.login_phone_max_attempts == 0 {
             return Err("RATE_LIMIT_LOGIN_PHONE_MAX_ATTEMPTS must be > 0".to_string());
+        }
+        if self.job.thumb_concurrency == 0 {
+            return Err("JOB_THUMB_CONCURRENCY must be > 0".to_string());
+        }
+        if self.job.thumb_max_attempts == 0 {
+            return Err("JOB_THUMB_MAX_ATTEMPTS must be > 0".to_string());
+        }
+        if self.job.thumb_enqueue_inflight == 0 {
+            return Err("JOB_THUMB_ENQUEUE_INFLIGHT must be > 0".to_string());
+        }
+        if self.job.heartbeat_interval.duration().is_zero() {
+            return Err("JOB_HEARTBEAT_INTERVAL must be > 0".to_string());
+        }
+        if self.job.missed_heartbeats == 0 {
+            return Err("JOB_MISSED_HEARTBEATS must be > 0".to_string());
         }
         Ok(())
     }
