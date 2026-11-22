@@ -104,6 +104,24 @@ fn parse_params_null_is_invalid_params() {
 }
 
 #[test]
+fn parse_notification_invalid_params_shape_is_dropped() {
+    // Spec §4.1: omitted id + illegal params → no reply (not -32602 with id null).
+    let scalar = parse_call_json(json!({
+        "jsonrpc": "2.0",
+        "method": "foo",
+        "params": "bar"
+    }));
+    assert!(matches!(scalar, ParseCall::Dropped));
+
+    let null_params = parse_call_json(json!({
+        "jsonrpc": "2.0",
+        "method": "foo",
+        "params": null
+    }));
+    assert!(matches!(null_params, ParseCall::Dropped));
+}
+
+#[test]
 fn parse_id_null_is_request_not_notification() {
     let parsed = parse_call_json(json!({
         "jsonrpc": "2.0",

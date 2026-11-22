@@ -540,6 +540,7 @@ where
                 mark_rpc_error(&error);
                 Some(Response::error(id, with_trace_id(error, trace_id)))
             }
+            ParseCall::Dropped => None,
             ParseCall::Notification(call) => {
                 let method = call.method.clone();
                 let run = async {

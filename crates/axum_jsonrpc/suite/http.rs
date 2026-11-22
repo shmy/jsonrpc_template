@@ -133,6 +133,65 @@ async fn http_success_and_notification() {
 }
 
 #[tokio::test]
+async fn http_notification_invalid_params_shape_is_null() {
+    // Spec §4.1 / jsonrpsee ACK: 200 + `null`, not -32602 with id null.
+    async fn bump() -> Result<(), ErrorObject> {
+        Ok(())
+    }
+
+    let app = RpcRouter::<()>::new()
+        .method("bump", bump)
+        .expect("register")
+        .into_axum_rpc_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/jsonrpc")
+                .header(CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    r#"{"jsonrpc":"2.0","method":"bump","params":"bar"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&body[..], b"null");
+}
+
+#[tokio::test]
+async fn http_all_notifications_batch_is_null() {
+    async fn update(Params(_): Params<Vec<i32>>) -> Result<(), ErrorObject> {
+        Ok(())
+    }
+
+    let app = RpcRouter::<()>::new()
+        .method("update", update)
+        .expect("register")
+        .into_axum_rpc_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/jsonrpc")
+                .header(CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    r#"[{"jsonrpc":"2.0","method":"update","params":[1]},{"jsonrpc":"2.0","method":"update","params":[2]}]"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&body[..], b"null");
+}
+
+#[tokio::test]
 async fn http_accepts_json_rpc_content_type() {
     async fn ping() -> Result<&'static str, ErrorObject> {
         Ok("pong")

@@ -107,6 +107,32 @@ async fn dispatch_mixed_batch_spec_example() {
 }
 
 #[tokio::test]
+async fn dispatch_batch_drops_notification_with_bad_params_shape() {
+    // Spec §4.1: dropped notification must not appear in the batch response array.
+    async fn ping() -> Result<&'static str, ErrorObject> {
+        Ok("pong")
+    }
+
+    let router = RpcRouter::<()>::new()
+        .method("ping", ping)
+        .expect("register");
+
+    let body = br#"[
+        {"jsonrpc":"2.0","method":"ping","params":"bar"},
+        {"jsonrpc":"2.0","method":"ping","id":1}
+    ]"#;
+
+    match router.dispatch_bytes(parts(), body, TEST_TRACE_ID).await {
+        DispatchOutcome::Batch(responses) => {
+            assert_eq!(responses.len(), 1);
+            assert_eq!(result_value(&responses[0]), json!("pong"));
+            assert_eq!(responses[0].id, Id::Number(1.into()));
+        }
+        other => panic!("unexpected {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn dispatch_invalid_batch_scalars() {
     match RpcRouter::<()>::new()
         .dispatch_bytes(parts(), b"[1,2,3]", TEST_TRACE_ID)

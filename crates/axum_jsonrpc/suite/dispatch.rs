@@ -248,6 +248,34 @@ async fn dispatch_notification_invalid_params_empty() {
 }
 
 #[tokio::test]
+async fn dispatch_notification_wire_params_shape_dropped_no_invoke() {
+    // Spec §4.1: omitted id + scalar/null params → Empty, and unit handlers must not run.
+    let hits = Arc::new(Mutex::new(0u32));
+
+    async fn bump(State(hits): State<Arc<Mutex<u32>>>) -> Result<(), ErrorObject> {
+        *hits.lock().expect("lock") += 1;
+        Ok(())
+    }
+
+    let router = RpcRouter::<Arc<Mutex<u32>>>::new()
+        .method("bump", bump)
+        .expect("register")
+        .with_state(hits.clone());
+
+    for body in [
+        br#"{"jsonrpc":"2.0","method":"bump","params":"bar"}"#.as_slice(),
+        br#"{"jsonrpc":"2.0","method":"bump","params":null}"#.as_slice(),
+    ] {
+        let outcome = router.dispatch_bytes(parts(), body, TEST_TRACE_ID).await;
+        assert!(
+            matches!(outcome, DispatchOutcome::Empty),
+            "expected Empty for {body:?}, got {outcome:?}"
+        );
+    }
+    assert_eq!(*hits.lock().expect("lock"), 0);
+}
+
+#[tokio::test]
 async fn dispatch_omitted_params_unit() {
     async fn ping() -> Result<&'static str, ErrorObject> {
         Ok("pong")

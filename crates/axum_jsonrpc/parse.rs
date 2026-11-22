@@ -17,6 +17,9 @@ pub(crate) enum ParseCall {
     Invalid { id: Id, error: ErrorObject },
     Notification(Call),
     Request { call: Call, id: Id },
+    /// Spec §4.1: notification envelope (valid `jsonrpc`+`method`, omitted `id`)
+    /// with illegal `params` shape — must not reply and must not invoke.
+    Dropped,
 }
 
 /// Top-level JSON-RPC payload (single call, batch of raw calls, or valid-JSON scalar).
@@ -100,15 +103,19 @@ pub(crate) fn validate_call(call: WireCall) -> ParseCall {
     };
 
     // Spec §4.2: if present, params MUST be Array (by-position) or Object (by-name).
-    // Wrong shape is treated as Invalid params (-32602), not Invalid Request.
+    // Wrong shape is Invalid params (-32602) for Requests; for Notifications (§4.1)
+    // the Server MUST NOT reply (and we skip invoke so unit handlers get no side effect).
     let params = match params {
         None => None,
         Some(raw) => match raw.get().trim_start().as_bytes().first() {
             Some(b'[') | Some(b'{') => Some(raw),
             _ => {
-                return ParseCall::Invalid {
-                    id: id_or_null(),
-                    error: ErrorObject::invalid_params(),
+                return match id {
+                    None => ParseCall::Dropped,
+                    Some(id) => ParseCall::Invalid {
+                        id,
+                        error: ErrorObject::invalid_params(),
+                    },
                 };
             }
         },
