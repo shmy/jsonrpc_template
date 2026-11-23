@@ -47,13 +47,14 @@ fn trim_query_fragment(path: &str) -> &str {
 
 /// 配置 domain 的 http↔https 对偶（无 scheme 则 `None`）。
 fn alt_scheme_domain(domain: &str) -> Option<String> {
-    if let Some(rest) = domain.strip_prefix("http://") {
-        Some(format!("https://{rest}"))
-    } else if let Some(rest) = domain.strip_prefix("https://") {
-        Some(format!("http://{rest}"))
-    } else {
-        None
-    }
+    domain
+        .strip_prefix("http://")
+        .map(|rest| format!("https://{rest}"))
+        .or_else(|| {
+            domain
+                .strip_prefix("https://")
+                .map(|rest| format!("http://{rest}"))
+        })
 }
 
 /// 剥 `{domain}/`；domain 的 http/https 对偶也试一次。未匹配 → `None`。
