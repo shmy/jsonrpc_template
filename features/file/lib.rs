@@ -12,11 +12,13 @@ use std::time::Duration;
 
 use app_state::AppState;
 #[cfg(feature = "blob-fs")]
+use axum::Extension;
+#[cfg(feature = "blob-fs")]
 use axum::Router;
 #[cfg(feature = "blob-fs")]
 use axum::middleware::from_fn;
 #[cfg(feature = "blob-fs")]
-use axum::routing::get_service;
+use axum::routing::get;
 #[cfg(feature = "blob-fs")]
 use axum::routing::put;
 use axum_jsonrpc::{RegisterError, RpcRouter};
@@ -29,15 +31,13 @@ use modrun::{Lifecycle, Module, task};
 use toasty::Db;
 use tokio::time::MissedTickBehavior;
 use tokio::time::interval;
-#[cfg(feature = "blob-fs")]
-use tower_http::services::ServeDir;
 
 #[cfg(feature = "blob-fs")]
 mod endpoints;
 mod methods;
 mod shared;
 
-/// GC 周期（仅 `MASTER=true` 挂 Lifecycle 间隔任务；缩略图走 `job_queue`/apalis）。
+/// GC 周期（仅 `MASTER=true` 挂 Lifecycle 间隔任务）。
 const GC_INTERVAL: Duration = Duration::from_secs(3600);
 
 pub fn module() -> Module {
@@ -50,20 +50,24 @@ pub fn module() -> Module {
     module
 }
 
-/// 本地 fs：`ServeDir(BLOB_FS_ROOT)` + 路径白名单（dated staging/正式）；
+/// 本地 fs：`GET /files/*`（可选 `?w=` → `shared::image_derive`）+ 路径白名单；
 /// 不可信扩展强制 `Content-Disposition: attachment`。`PUT /files/presigned` 仍走 HMAC。
 #[cfg(feature = "blob-fs")]
 fn public_routes(cli: Cli) -> PublicRouter {
-    let root = cli.blob.blob_fs_root.clone();
-    let static_files = get_service(ServeDir::new(root))
-        .layer(from_fn(endpoints::file_serve_guard::blob_fs_static_guard));
+    let fs = shared::blob_fs::BlobFsRoot::new(cli.blob.blob_fs_root.clone());
+    // GET 独立子树挂守卫，避免 MethodRouter::layer 的 NewError 推断问题，
+    // 且不把路径白名单套到 PUT /presigned。
+    let get_files = Router::new()
+        .fallback(get(endpoints::file_get::handler))
+        .layer(from_fn(endpoints::file_serve_guard::blob_fs_static_guard))
+        .layer(Extension(fs));
 
     PublicRouter(
         Router::<AppState>::new().nest(
             "/files",
             Router::new()
                 .route("/presigned", put(endpoints::file_presigned_put::handler))
-                .fallback_service(static_files),
+                .merge(get_files),
         ),
     )
 }

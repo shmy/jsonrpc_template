@@ -74,6 +74,13 @@ header "X-Content-Type-Options" == "nosniff"
 header "Content-Disposition" not exists
 bytes count > 0
 
+# staging 禁止派生：?w= 忽略，仍回原图（不落 *_w*.webp）
+GET {{base_url}}/files/{{presign_path}}?w=256
+HTTP 200
+[Asserts]
+header "Content-Type" == "image/webp"
+bytes count > 0
+
 # 危险扩展名拒签
 POST {{base_url}}/jsonrpc
 Authorization: Bearer {{file_admin_at}}
@@ -131,6 +138,26 @@ HTTP 200
 header "Content-Type" == "image/webp"
 header "X-Content-Type-Options" == "nosniff"
 header "Content-Disposition" not exists
+bytes count > 0
+
+# URL 派生：非法 w → 400
+GET {{formal_avatar}}?w=999
+HTTP 400
+
+# URL 派生：首次生成 + 缓存命中（均为 image/webp + 长期 Cache-Control）
+GET {{formal_avatar}}?w=256
+HTTP 200
+[Asserts]
+header "Content-Type" == "image/webp"
+header "X-Content-Type-Options" == "nosniff"
+header "Cache-Control" == "public, max-age=31536000, immutable"
+bytes count > 0
+
+GET {{formal_avatar}}?w=256
+HTTP 200
+[Asserts]
+header "Content-Type" == "image/webp"
+header "Cache-Control" == "public, max-age=31536000, immutable"
 bytes count > 0
 
 # 已消费的 staging 再绑 → -32033 file_attachment_not_found
@@ -232,6 +259,7 @@ Content-Type: application/json
 }
 HTTP 200
 [Captures]
+large_path: jsonpath "$.result.path"
 large_upload_url: jsonpath "$.result.upload_url"
 [Asserts]
 jsonpath "$.error" not exists
@@ -240,6 +268,13 @@ PUT {{large_upload_url}}
 Content-Type: video/mp4
 file,fixtures/over-2m.bin;
 HTTP 204
+
+# 非图片带 ?w=：忽略派生，仍按原文件回源（MIME 保留）
+GET {{base_url}}/files/{{large_path}}?w=256
+HTTP 200
+[Asserts]
+header "Content-Type" == "video/mp4"
+bytes count > 0
 
 # 清理测试账号
 POST {{base_url}}/jsonrpc

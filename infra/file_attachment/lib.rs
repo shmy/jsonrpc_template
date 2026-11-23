@@ -8,12 +8,12 @@
 use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use blob_kit::{Blob, BlobError, is_staging_object_path, resolve_staging_move_paths};
 use cache_kit::Cache;
-use file_contract::{FileError, thumb_object_path};
+use file_contract::{DEFAULT_DERIVE_WIDTH, FileError, derived_cache_paths, thumb_object_path};
 use identity_contract::Id;
 use rootcause::Result;
 use toasty::sql::query;
@@ -70,52 +70,20 @@ fn clear_attachment_in_use_collectors_for_test() {
     in_use_lock().clear();
 }
 
-/// 缩略图入队 future（由 `job_queue` 在 module 启动时注册）。
-pub type ImageThumbnailEnqueueFuture = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
-
-/// 进程级缩略图入队器。
-pub type ImageThumbnailEnqueuer = Arc<dyn Fn(String) -> ImageThumbnailEnqueueFuture + Send + Sync>;
-
-static IMAGE_THUMB_ENQUEUER: OnceLock<ImageThumbnailEnqueuer> = OnceLock::new();
-
-/// 注册缩略图入队实现（`job_queue::module()` 内调用；仅首次生效）。
-pub fn register_image_thumbnail_enqueuer(enqueuer: ImageThumbnailEnqueuer) {
-    if IMAGE_THUMB_ENQUEUER.set(enqueuer).is_err() {
-        tracing::warn!("image thumbnail enqueuer already registered; ignoring duplicate set");
-    }
-}
-
-/// commit 成功后尽力入队生成缩略图；未注册 / 非图片只 skip。
+/// 由正式 path / 本站 fill_url 派生缩略图公网 URL。
 ///
-/// `job_queue` 注册器同步 `try_acquire` + `spawn`（`ready(Ok)`，不进 Redis）；
-/// push / inflight 满的失败在 job_queue 内计数 + warn。
-pub async fn enqueue_image_thumbnail_best_effort(formal_path: &str) {
-    let Some(_) = thumb_object_path(formal_path) else {
-        return;
-    };
-    let Some(enqueuer) = IMAGE_THUMB_ENQUEUER.get() else {
-        tracing::debug!(
-            path = formal_path,
-            "image thumbnail enqueuer not registered; skip"
-        );
-        return;
-    };
-    // 默认实现恒 Ok；保留 Err 分支供自定义 enqueuer。
-    if let Err(err) = enqueuer(formal_path.to_string()).await {
-        tracing::warn!(
-            error = %err,
-            path = formal_path,
-            "image thumbnail enqueuer returned error; display may fallback to original"
-        );
-    }
-}
-
-/// 由正式 path / 本站 fill_url 派生缩略图公网 URL（文件可能尚未生成）。
+/// - **fs**：`…/id.ext?w=256`（同进程按需派生）
+/// - **cos / 其它**：`None`（无同进程 `?w=`；勿拼假参数）
 #[must_use]
 pub fn thumb_public_url(blob: &Blob, formal_or_url: &str) -> Option<String> {
+    // 仅 fs 实现 URL 派生；cos 等不要谎称 `?w=`。
+    let _ = blob.as_fs()?;
     let stripped = blob.strip_public_url_prefix(formal_or_url.trim());
-    let thumb = thumb_object_path(stripped.as_ref())?;
-    Some(blob.fill_public_url(&thumb).into_owned())
+    let path = stripped.as_ref();
+    // staging / 非图 / 已派生 → None（与 `derived_object_path` 对齐）。
+    let _ = thumb_object_path(path)?;
+    let base = blob.fill_public_url(path);
+    Some(format!("{base}?w={DEFAULT_DERIVE_WIDTH}"))
 }
 
 /// pending commit（refcount=0 且未 tombstone）超过此时长可被 AttachmentGc 回收。
@@ -202,7 +170,6 @@ pub async fn commit_staging(
         restore_staging_claim(cache, &from, actor_id).await;
         return Err(map_blob_report(err));
     }
-    enqueue_image_thumbnail_best_effort(&path).await;
     Ok(path)
 }
 
@@ -347,12 +314,10 @@ pub async fn list_gc_candidates(db: &mut dyn Executor) -> Result<Vec<String>> {
     Ok(out)
 }
 
-/// 删除 blob（含约定缩略图）并移除登记行（Gc 用）。
+/// 删除 blob（含 URL 派生缓存 + 旧 `_sm.webp`）并移除登记行（Gc 用）。
 pub async fn purge_object(db: &mut dyn Executor, blob: &Blob, path: &str) -> Result<()> {
     let mut keys = vec![path.to_string()];
-    if let Some(thumb) = thumb_object_path(path) {
-        keys.push(thumb);
-    }
+    keys.extend(derived_cache_paths(path));
     if let Err(err) = blob.delete_many(keys).await {
         tracing::warn!(error = %err, path, "attachment gc: blob delete failed");
         return Err(err);
@@ -394,19 +359,27 @@ mod tests {
     }
 
     #[test]
-    fn purge_keys_include_derived_thumb() {
+    fn purge_keys_include_derived_cache() {
         let path = "2026/01/abc.jpg";
         let mut keys = vec![path.to_string()];
-        if let Some(thumb) = thumb_object_path(path) {
-            keys.push(thumb);
-        }
-        assert_eq!(
-            keys,
-            vec![
-                "2026/01/abc.jpg".to_string(),
-                "2026/01/abc_sm.webp".to_string()
-            ]
-        );
+        keys.extend(derived_cache_paths(path));
+        assert!(keys.iter().any(|k| k == "2026/01/abc.jpg"));
+        assert!(keys.iter().any(|k| k == "2026/01/abc_w256.webp"));
+        assert!(keys.iter().any(|k| k == "2026/01/abc_sm.webp"));
         assert!(thumb_object_path("2026/01/clip.mp4").is_none());
+        assert_eq!(
+            thumb_public_url_shape("http://localhost:8080/files/2026/01/abc.jpg"),
+            Some("http://localhost:8080/files/2026/01/abc.jpg?w=256".into())
+        );
+    }
+
+    /// 不依赖真实 Blob：只测 query 拼接形态（strip 后仍是 http 时 fill 原样）。
+    fn thumb_public_url_shape(url: &str) -> Option<String> {
+        let path = url.trim();
+        let ext = path.rsplit_once('.')?.1.split('?').next()?;
+        if !file_contract::is_image_extension(ext) {
+            return None;
+        }
+        Some(format!("{path}?w={DEFAULT_DERIVE_WIDTH}"))
     }
 }

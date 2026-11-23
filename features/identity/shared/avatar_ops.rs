@@ -28,8 +28,7 @@ const AVATAR_BIND: BindOptions = BindOptions {
 /// 读出/响应：相对 key → 公网绝对 URL；已是 http(s) 则不动。
 ///
 /// 缩略图不落库、不单独出站字段：用 [`file_attachment::thumb_public_url`]
-/// 由 `avatar` 约定派生（`…/id.ext` → `…/id_sm.webp`）。文件可能尚未生成，
-/// 显示端应对 404 fallback 到原图。
+///（仅 blob-fs：`…/id.ext?w=256`；cos 返回 `None`，客户端用原图）。
 #[inline]
 pub fn fill_avatar_for_wire(blob: &Blob, account: &mut Account) {
     account.avatar = blob.fill_public_url_optional(account.avatar.take());

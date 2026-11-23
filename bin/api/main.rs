@@ -35,8 +35,6 @@ async fn main() -> Result<()> {
         .module(persistence::module())
         .module(cache::module())
         .module(blob::module())
-        // job_queue：apalis worker（缩略图等）；在 blob 之后，业务 feature 之前注册入队器
-        .module(job_queue::module())
         // Features register FTL + domain mappers / attachment in-use hooks
         // here (before http_server seals at invoke). identity 先于 file，
         // 以便 AttachmentGc 启动前 in-use 钩子已注册。

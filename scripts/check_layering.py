@@ -12,7 +12,6 @@ Allowed infra → *_contract:
   - persistence → identity_contract, file_contract
   - http_auth → identity_contract
   - file_attachment → identity_contract, file_contract
-  - job_queue → file_contract
 """
 
 from __future__ import annotations
@@ -89,7 +88,6 @@ INFRA_CONTRACT_ALLOW: dict[str, set[str]] = {
     "persistence": {"identity_contract", "file_contract"},
     "http_auth": {"identity_contract"},
     "file_attachment": {"identity_contract", "file_contract"},
-    "job_queue": {"file_contract"},
 }
 
 

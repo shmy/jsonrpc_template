@@ -1,8 +1,8 @@
 //! 与存储无关的图像派生：解码（带 Limits）→ SIMD 缩放 → WebP 编码。
 //!
-//! 供 job worker 在 `spawn_blocking` 中调用；不依赖 Blob / Redis / RPC。
+//! 供 HTTP 同进程派生（`spawn_blocking`）等调用；不依赖 Blob / Redis / RPC。
 //!
-//! [`ImageError`] **全部变体均不可重试**（坏图 / 超限 / 编码失败）；job 层应 ack 丢弃。
+//! [`ImageError`] **全部变体均不可重试**（坏图 / 超限 / 编码失败）。
 //! `Limits::max_alloc` 对部分 codec 非严格——主要靠 `max_image_width/height` +
 //! [`MAX_SOURCE_BYTES`] 压缩体积上限兜底。
 
@@ -51,12 +51,21 @@ pub enum ImageError {
 }
 
 /// 将任意图片字节渲染为最长边不超过 [`THUMB_MAX_EDGE`] 的 WebP。
+#[inline]
 pub fn render_thumb(source: &[u8]) -> Result<Vec<u8>, ImageError> {
+    render_max_edge(source, THUMB_MAX_EDGE)
+}
+
+/// 将任意图片字节渲染为最长边不超过 `max_edge` 的 WebP（`max_edge == 0` → [`ProcessFailed`]）。
+pub fn render_max_edge(source: &[u8], max_edge: u32) -> Result<Vec<u8>, ImageError> {
+    if max_edge == 0 {
+        return Err(ImageError::ProcessFailed);
+    }
     if source.len() > MAX_SOURCE_BYTES {
         return Err(ImageError::SourceTooLarge);
     }
     let img = decode(source)?;
-    let (w, h, rgba) = to_thumb_rgba(img, THUMB_MAX_EDGE)?;
+    let (w, h, rgba) = to_thumb_rgba(img, max_edge)?;
     encode_webp_rgba(&rgba, w, h)
 }
 

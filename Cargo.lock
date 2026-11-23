@@ -156,70 +156,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
-name = "apalis"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1cb7bae899855cc8061713337c566c8ef1faac22c1eef94105c8825b12a8f03"
-dependencies = [
- "apalis-core",
- "futures-util",
- "pin-project",
- "thiserror",
- "tower",
- "tracing",
-]
-
-[[package]]
-name = "apalis-codec"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c83ba913ee1b2a705787c385b2f270ed72e8c69f6544d004f40a82d164b2093c"
-dependencies = [
- "apalis-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "apalis-core"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a96aeab395a16930e64f8836af56ba5c20232a330f7e63032abccf397a39742"
-dependencies = [
- "futures-channel",
- "futures-core",
- "futures-sink",
- "futures-timer",
- "futures-util",
- "pin-project",
- "rand 0.10.4",
- "serde",
- "thiserror",
- "tower-layer",
- "tower-service",
- "tracing",
- "ulid",
- "uuid",
-]
-
-[[package]]
-name = "apalis-redis"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9313856b07b7cd1cb2f8a49b7c460ad5be74d7160ee242c31effbebecc43aa8"
-dependencies = [
- "apalis-codec",
- "apalis-core",
- "futures",
- "redis",
- "serde",
- "serde_json",
- "thiserror",
- "tracing",
- "ulid",
-]
-
-[[package]]
 name = "api"
 version = "0.1.0"
 dependencies = [
@@ -230,7 +166,6 @@ dependencies = [
  "http_routing",
  "http_server",
  "identity",
- "job_queue",
  "modrun",
  "persistence",
  "probe",
@@ -483,15 +418,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
-]
-
-[[package]]
-name = "backon"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cffb0e931875b666fc4fcb20fee52e9bbd1ef836fd9e9e04ec21555f9f85f7ef"
-dependencies = [
- "fastrand",
 ]
 
 [[package]]
@@ -1422,6 +1348,7 @@ dependencies = [
  "file_contract",
  "http_auth",
  "http_routing",
+ "image_kit",
  "jiff",
  "locale",
  "mime_guess",
@@ -1431,6 +1358,7 @@ dependencies = [
  "serde",
  "toasty",
  "tokio",
+ "tower",
  "tower-http 0.7.1",
  "tracing",
  "validify",
@@ -1565,7 +1493,6 @@ checksum = "9a31d2a3fbaaeb2af2368bbdd904aa8e812d3c04a1ee10d3171f52d556e5d0a3"
 dependencies = [
  "futures-channel",
  "futures-core",
- "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -1638,12 +1565,6 @@ name = "futures-task"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd417de3d1d015fc3bfd2b1ea46dfc7bab72ef86f1cc7cc9c78e728b34a6d1fd"
-
-[[package]]
-name = "futures-timer"
-version = "3.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af43fadb8a98512d547e37b4e92e0ced13e205c061b87b4623eff01d918d6968"
 
 [[package]]
 name = "futures-util"
@@ -2589,31 +2510,6 @@ checksum = "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264"
 dependencies = [
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "job_queue"
-version = "0.1.0"
-dependencies = [
- "apalis",
- "apalis-redis",
- "blob_kit",
- "config",
- "file_attachment",
- "file_contract",
- "http",
- "image",
- "image_kit",
- "modrun",
- "redis",
- "rootcause",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "trace_kit",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3865,14 +3761,11 @@ version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bef8fa589dd53a8a379a7856de1365d0a1be50c6b8aebb5c01c1ec441a2c509"
 dependencies = [
- "arc-swap",
  "arcstr",
  "async-lock",
- "backon",
  "bytes",
  "cfg-if",
  "combine",
- "futures-channel",
  "futures-util",
  "itoa",
  "percent-encoding",
@@ -5828,18 +5721,6 @@ name = "typenum"
 version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
-
-[[package]]
-name = "ulid"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "947dde63b6d514cc5e044edad4e0ca7261afd1099d16c83d942cb2b2f348689c"
-dependencies = [
- "rand 0.10.4",
- "serde",
- "uuid",
- "web-time",
-]
 
 [[package]]
 name = "uncased"

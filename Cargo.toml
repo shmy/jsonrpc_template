@@ -22,7 +22,6 @@ members = [
     "infra/cache",
     "infra/config",
     "infra/file_attachment",
-    "infra/job_queue",
     "infra/http_auth",
     "infra/http_extractors",
     "infra/http_routing",
@@ -183,15 +182,7 @@ tempoid = { version = "0.1", default-features = false }
 blob_kit = { version = "0.1.0", path = "crates/blob_kit", default-features = false }
 blob = { version = "0.1.0", path = "infra/blob", default-features = false }
 image_kit = { version = "0.1.0", path = "crates/image_kit" }
-job_queue = { version = "0.1.0", path = "infra/job_queue" }
 file_attachment = { version = "0.1.0", path = "infra/file_attachment" }
-apalis = { version = "1.2", default-features = false, features = [
-    "retry",
-    "limit",
-    "catch-panic",
-    "tracing",
-] }
-apalis-redis = { version = "1.2", default-features = false }
 file = { version = "0.1.0", path = "features/file", default-features = false }
 file_contract = { version = "0.1.0", path = "features/file_contract" }
 mime_guess = { version = "2.0", default-features = false }

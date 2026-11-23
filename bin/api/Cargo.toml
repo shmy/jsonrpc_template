@@ -10,7 +10,7 @@ path = "main.rs"
 
 [features]
 default = ["otlp", "blob-fs"]
-otlp = ["trace_kit/otlp", "http_server/otel", "job_queue/trace"]
+otlp = ["trace_kit/otlp", "http_server/otel"]
 # Blob 后端 meta-feature：只在此切换；对齐表见 docs/blob-backends.md
 # blob-fs → blob/fs + file/blob-fs（→ app_state/blob-fs + config/fs）
 # blob-cos → blob/cos + file/blob-cos（对称）
@@ -27,7 +27,6 @@ file = { workspace = true }
 config = { workspace = true }
 cache = { workspace = true }
 blob = { workspace = true }
-job_queue = { workspace = true }
 probe = { workspace = true }
 trace_kit = { workspace = true }
 persistence = { workspace = true }
