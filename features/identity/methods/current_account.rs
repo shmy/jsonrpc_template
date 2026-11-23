@@ -1,17 +1,22 @@
 use axum::extract::State;
 use axum_jsonrpc::rpc;
+use blob_kit::Blob;
 use http_auth::AuthedAccount;
 use identity_contract::Account;
 use rootcause::Result;
 use toasty::Db;
 
+use crate::shared::avatar_ops;
+
 /// 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
 #[rpc("identity.account.current")]
-#[tracing::instrument(skip(db), fields(%caller))]
+#[tracing::instrument(skip(db, blob), fields(%caller))]
 pub async fn current_account(
     AuthedAccount(caller): AuthedAccount,
     State(mut db): State<Db>,
+    State(blob): State<Blob>,
 ) -> Result<Account> {
-    let account = Account::require_by_id(&mut db, caller).await?;
+    let mut account = Account::require_by_id(&mut db, caller).await?;
+    avatar_ops::fill_avatar_for_wire(&blob, &mut account);
     Ok(account)
 }

@@ -1,7 +1,7 @@
 //! 正式对象按需派生：读原图 → `image_kit` → 尽力落盘缓存。
 //!
 //! 与 HTTP 无关；闸门 / 结果由 endpoint 映射状态码。
-//! `staging/` 是否可派生由 [`file_contract::derived_object_path`] 决定。
+//! 对象是否可派生由 [`file_contract::resolve_derive_request`] 先行决议。
 
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
@@ -48,13 +48,8 @@ pub(crate) async fn materialize(
     width: u32,
     _permit: OwnedSemaphorePermit,
 ) -> Materialize {
-    match blob.exists(cache_path).await {
-        Ok(true) => return Materialize::OnDisk,
-        Ok(false) => {}
-        Err(err) => {
-            tracing::warn!(error = %err, path = cache_path, "derive cache exists recheck failed");
-            return Materialize::Failed;
-        }
+    if let Some(outcome) = cache_hit(blob, cache_path).await {
+        return outcome;
     }
 
     let source = match blob.read(source_path).await {
@@ -85,4 +80,16 @@ pub(crate) async fn materialize(
         tracing::warn!(error = %err, path = cache_path, "derive cache write failed; serving memory");
     }
     Materialize::Fresh(rendered)
+}
+
+/// `Some(OnDisk|Failed)` 已有定论；`None` 表示需继续派生。
+async fn cache_hit(blob: &Blob, cache_path: &str) -> Option<Materialize> {
+    match blob.exists(cache_path).await {
+        Ok(true) => Some(Materialize::OnDisk),
+        Ok(false) => None,
+        Err(err) => {
+            tracing::warn!(error = %err, path = cache_path, "derive cache exists recheck failed");
+            Some(Materialize::Failed)
+        }
+    }
 }

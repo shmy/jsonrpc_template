@@ -60,7 +60,7 @@
 ## 已完成（blob / file / clients）
 
 - [x] `blob_kit` + `infra/blob`（fs / 腾讯 COS）；上传仅 `file.presign`
-- [x] （fs）`PUT /files/presigned` + `GET /files/*`（可选 `?w=128|256|512` 派生 WebP 落盘缓存）
+- [x] （fs）`PUT /files/presigned` + `GET /files/*`（可选 `?w=128|256|512|1024` 派生 WebP 落盘缓存）
 - [x] `infra/file_attachment` + identity avatar + Lifecycle GC
 - [x] `image_kit` + fs URL 派生缩略图（`*_w{n}.webp` 缓存；旧 `_sm.webp` GC 仍清）
 - [x] 多语言客户端生成 + CI `clients-check`（OpenRPC 漂移 + bun session.test）

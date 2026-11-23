@@ -29,7 +29,7 @@ cargo run -p api
 | `GET` | `/healthz` | 存活探测，返回 `OK` |
 | `GET` | `/readyz` | 就绪探测：Postgres 可取连接且 Redis `probe` 成功 → `200`，否则 `503` |
 | `PUT` | `/files/presigned` | `blob-fs` 本地预签名直传（HMAC query；COS 不挂，客户端 PUT 到 Cos URL） |
-| `GET` | `/files/{*path}` | `blob-fs`：dated 路径白名单；正式对象可选 `?w=128\|256\|512` 按需派生 WebP（`*_w{n}.webp`；`staging/` 禁止）；可信扩展可内联，其余 `Content-Disposition: attachment`（COS 不挂） |
+| `GET` | `/files/{*path}` | `blob-fs`：dated 路径白名单；正式对象可选 `?w=128\|256\|512\|1024` 按需派生 WebP（`*_w{n}.webp`；`staging/` 禁止）；可信扩展可内联，其余 `Content-Disposition: attachment`（COS 不挂） |
 
 ### 健康检查
 

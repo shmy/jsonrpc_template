@@ -131,6 +131,38 @@ jsonpath "$.error" not exists
 jsonpath "$.result.avatar" matches /\/files\/[0-9]{4}\/[0-9]{2}\//
 jsonpath "$.result.avatar" not matches /\/staging\//
 
+# identity.account.current 出站 avatar 须拼绝对 URL（曾漏 fill 导致相对 path）
+POST {{base_url}}/jsonrpc
+Content-Type: application/json
+{
+  "jsonrpc": "2.0",
+  "id": 4.1,
+  "method": "identity.account.login",
+  "params": {
+    "phone": "13900009997",
+    "password": "e2euser12"
+  }
+}
+HTTP 200
+[Captures]
+file_avatar_user_at: jsonpath "$.result.access_token"
+[Asserts]
+jsonpath "$.error" not exists
+
+POST {{base_url}}/jsonrpc
+Authorization: Bearer {{file_avatar_user_at}}
+Content-Type: application/json
+{
+  "jsonrpc": "2.0",
+  "id": 4.2,
+  "method": "identity.account.current"
+}
+HTTP 200
+[Asserts]
+jsonpath "$.error" not exists
+jsonpath "$.result.avatar" == "{{formal_avatar}}"
+jsonpath "$.result.avatar" matches /\/files\/[0-9]{4}\/[0-9]{2}\//
+
 # commit 后正式 path 回源（服务端已拼绝对 URL；可信扩展可内联）
 GET {{formal_avatar}}
 HTTP 200

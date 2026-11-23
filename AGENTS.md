@@ -11,7 +11,7 @@ Axum + `modrun` 的 **JSON-RPC 2.0 应用脚手架**。
 - **可复用协议核**：`crates/axum_jsonrpc*`（可单独依赖）
 - **应用模板**：`bin/` + `features/` + `infra/`（示范如何挂业务）
 
-默认端点：`POST /jsonrpc`、`GET /openrpc.json`、`GET /livez`、`GET /healthz`、`GET /readyz`、（`blob-fs`）`PUT /files/presigned` + `GET /files/{*path}`（可选 `?w=128|256|512`）；上传走 JSON-RPC `file.presign`。
+默认端点：`POST /jsonrpc`、`GET /openrpc.json`、`GET /livez`、`GET /healthz`、`GET /readyz`、（`blob-fs`）`PUT /files/presigned` + `GET /files/{*path}`（可选 `?w=128|256|512|1024`）；上传走 JSON-RPC `file.presign`。
 
 ## 分层与依赖方向（必须遵守）
 
