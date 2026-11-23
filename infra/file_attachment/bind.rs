@@ -55,6 +55,17 @@ fn is_blob_key(path: &str) -> bool {
     !is_external_url(path)
 }
 
+/// 列存 / in-use 归一：剥本站 domain（含 http↔https、去 `?w=`）；真外链或空 → `None`。
+pub(crate) fn normalize_column_path(blob: &Blob, path: &str) -> Option<String> {
+    let stripped = blob.strip_public_url_prefix(path.trim());
+    let key = stripped.as_ref();
+    if key.is_empty() || is_external_url(key) {
+        None
+    } else {
+        Some(stripped.into_owned())
+    }
+}
+
 /// 绑定策略。
 #[derive(Clone, Copy, Debug)]
 pub struct BindOptions {
@@ -224,20 +235,22 @@ pub async fn detach_fresh_best_effort(db: &mut Db, fresh: Option<&str>) {
 }
 
 /// 删实体前扣减列引用：未登记的脏 path 只 warn 不阻断删除；外链跳过。
-pub async fn detach_column_for_delete(db: &mut Db, path: &str) -> Result<()> {
-    if is_external_url(path) {
+///
+/// 先 [`normalize_column_path`]：库内脏本站绝对 URL 仍按相对 key detach。
+pub async fn detach_column_for_delete(db: &mut Db, blob: &Blob, path: &str) -> Result<()> {
+    let Some(key) = normalize_column_path(blob, path) else {
         return Ok(());
-    }
-    detach_allowing_missing(db, path).await
+    };
+    detach_allowing_missing(db, &key).await
 }
 
 /// 删行失败回滚：重新登记刚扣减的引用（失败只 warn，防阻断重试）；外链跳过。
-pub async fn reattach_best_effort(db: &mut Db, path: &str) {
-    if is_external_url(path) {
+pub async fn reattach_best_effort(db: &mut Db, blob: &Blob, path: &str) {
+    let Some(key) = normalize_column_path(blob, path) else {
         return;
-    }
-    if let Err(err) = attach(db, path).await {
-        tracing::warn!(error = %err, path, "attachment reattach degraded");
+    };
+    if let Err(err) = attach(db, &key).await {
+        tracing::warn!(error = %err, path = %key, "attachment reattach degraded");
     }
 }
 
@@ -301,6 +314,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn normalize_column_path_strips_own_domain_skips_external() {
+        let blob = test_blob().await;
+        assert_eq!(
+            normalize_column_path(&blob, "http://test.local/files/2026/01/a.webp").as_deref(),
+            Some("2026/01/a.webp")
+        );
+        assert_eq!(
+            normalize_column_path(&blob, "  2026/01/b.webp  ").as_deref(),
+            Some("2026/01/b.webp")
+        );
+        assert_eq!(
+            normalize_column_path(&blob, "https://cdn.example/a.webp"),
+            None
+        );
+        assert_eq!(normalize_column_path(&blob, "   "), None);
+    }
+
+    #[tokio::test]
+    async fn normalize_column_path_query_and_scheme_alt() {
+        let blob = test_blob().await;
+        // 配置 domain 为 http；脏数据 https + ?w= 仍归一。
+        assert_eq!(
+            normalize_column_path(&blob, "https://test.local/files/2026/01/a.webp?w=256")
+                .as_deref(),
+            Some("2026/01/a.webp")
+        );
+        assert_eq!(
+            normalize_column_path(&blob, "2026/01/b.webp?w=512").as_deref(),
+            Some("2026/01/b.webp")
+        );
+        // 外链（含 query）仍不进 in-use。
+        assert_eq!(
+            normalize_column_path(&blob, "https://cdn.example/a.webp?sig=1"),
+            None
+        );
+    }
+
+    #[tokio::test]
     async fn keep_current_normalizes_own_domain_url() {
         let blob = test_blob().await;
         let kept = keep_current(&blob, Some("http://test.local/files/2026/01/a.webp"));
@@ -314,6 +365,14 @@ mod tests {
         let ext = keep_current(&blob, Some("https://cdn.example/a.webp"));
         assert_eq!(ext.stored.as_deref(), Some("https://cdn.example/a.webp"));
         assert!(keep_current(&blob, None).stored.is_none());
+    }
+
+    #[tokio::test]
+    async fn keep_current_preserves_external_signed_query() {
+        let blob = test_blob().await;
+        let url = "https://cdn.example/a.webp?sig=secret&exp=1";
+        let kept = keep_current(&blob, Some(url));
+        assert_eq!(kept.stored.as_deref(), Some(url));
     }
 
     /// 清空：旧 blob key 记入 stale 延迟扣减；旧外链无引用。

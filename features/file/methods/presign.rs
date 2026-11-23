@@ -1,8 +1,10 @@
 use std::time::Duration;
 
+use app_state::AuthRateLimit;
 use axum::extract::State;
 use axum_jsonrpc::{ValidatedParams, rpc};
 use blob_kit::Blob;
+use cache_kit::Cache;
 use file_contract::{FileError, staging_dated_file_path};
 use http_auth::AuthedAccount;
 use rootcause::Result;
@@ -10,10 +12,9 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use validify::Validate;
 
-use cache_kit::Cache;
-
 use crate::shared::allowed_extensions;
 use crate::shared::extensions::content_type_for_extension;
+use crate::shared::rate_limit::enforce_presign_subject;
 
 const DEFAULT_EXPIRE_SECS: u64 = 600;
 const MAX_EXPIRE_SECS: u64 = 3600;
@@ -43,13 +44,15 @@ pub struct PresignResponse {
 ///
 /// 服务端**不**校验文件内容（与 Cos 直传一致）；扩展名白名单见 `BLOB_ALLOWED_EXTENSIONS`。
 #[rpc("file.presign")]
-#[tracing::instrument(skip(blob, cache, request), fields(%caller))]
+#[tracing::instrument(skip(blob, cache, auth_rate, request), fields(%caller))]
 pub async fn presign(
     AuthedAccount(caller): AuthedAccount,
     State(blob): State<Blob>,
     State(cache): State<Cache>,
+    State(auth_rate): State<AuthRateLimit>,
     ValidatedParams(request): ValidatedParams<PresignRequest>,
 ) -> Result<PresignResponse> {
+    enforce_presign_subject(&cache, auth_rate, caller).await?;
     let ext = request
         .extension
         .trim()

@@ -56,11 +56,18 @@ pub fn attachment_in_use_collector_count() -> usize {
 }
 
 /// 合并全部已注册收集器的 in-use path。
-pub async fn collect_all_in_use(db: &mut Db) -> Result<HashSet<String>> {
+///
+/// 经 [`bind::normalize_column_path`] 归一：本站绝对 URL → 相对 key；真外链丢弃，
+/// 避免脏数据导致安全网对不上 `blob_objects.path`。
+pub async fn collect_all_in_use(db: &mut Db, blob: &Blob) -> Result<HashSet<String>> {
     let collectors = in_use_lock().clone();
     let mut out = HashSet::new();
     for collector in collectors {
-        out.extend(collector(db).await?);
+        for path in collector(db).await? {
+            if let Some(key) = bind::normalize_column_path(blob, &path) {
+                out.insert(key);
+            }
+        }
     }
     Ok(out)
 }

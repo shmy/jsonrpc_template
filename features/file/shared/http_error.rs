@@ -19,6 +19,7 @@ const fn http_status(err: &FileError) -> StatusCode {
     match err {
         FileError::AttachmentNotFound => StatusCode::NOT_FOUND,
         FileError::PresignUnsupported => StatusCode::NOT_IMPLEMENTED,
+        FileError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
         FileError::AttachmentInvalid | FileError::AttachmentNotRegistered => {
             StatusCode::BAD_REQUEST
         }

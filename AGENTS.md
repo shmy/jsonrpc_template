@@ -102,7 +102,7 @@ features/<name>/
 
 1. 新建 `features/<name>`，`#[rpc("domain.action")]` 写 handler
 2. `RpcRouter::<AppState>::new().register(foo_rpc)?…`：**默认包进 `PrivateRpc`**（merge 时统一鉴权门）；仅匿名方法（如 login / refresh）进 `PublicRpc`（identity `create` 需登录但恒 `privileged=false`）
-3. `bin/api`：`.module(your_feature::module())`——**`persistence` / `cache` / `blob` 以及所有会 `register_ftl` / `register_domain_mapper` 的 feature 必须排在 `http_server` 之前**（`http_server` 在 `register` 时 `seal_bundles` + `seal_domain_mappers`；挂在其后会 panic 或域错误静默变成 `-32603`）；根上需 `init_group::<PublicRpc>()` + `init_group::<PrivateRpc>()`（探针另加 `init_group::<ProbeRouter>()`；HTTP 组另加 Public/Private Router）
+3. `bin/api`：`.module(your_feature::module())`——**`persistence` / `cache` / `blob` 以及所有会 `register_ftl` / `register_domain_mapper` 的 feature 必须排在 `http_server` 之前**（`http_server` 在 `register` 时 `seal_bundles` + `seal_domain_mappers`；挂在其后会 panic 或域错误静默变成 `-32603`；`just layering` → `scripts/check_module_order.py` 会扫描并校验）；根上需 `init_group::<PublicRpc>()` + `init_group::<PrivateRpc>()`（探针另加 `init_group::<ProbeRouter>()`；HTTP 组另加 Public/Private Router）
 4. HTTP 非 RPC：探针走 `ProbeRouter`（见 `features/probe`）；公开 HTTP 走 `PublicRouter`（示范：`blob-fs` 下 `GET /files/*`（可选 `?w=` 派生）+ `is_public_readable_object_path` 守卫 + 不可信扩展 `Content-Disposition: attachment` + 本地预签名 PUT；默认 16 MiB body；Cos 不挂回源；staging GET 无 claim，靠高熵 path）；需登录走 `PrivateRouter`（当前模板无业务 HTTP；可按需扩展）
 5. 需要 caller id 时再在 handler 参数加 `http_auth::AuthedAccount`（读 soft 中间件写入的 extensions）。**「要不要登录」由 `PrivateRpc` 分组决定**，勿依赖漏写提取器；勿在 `/jsonrpc` 上硬鉴权（公开方法共用该端点）
 6. 需要落库 / 跨 feature 共享类型：放 `features/<name>_contract`；其它 feature **只**依赖该 contract；在 `persistence` 里 `toasty::models!(…)` 注册
@@ -128,7 +128,7 @@ Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `Fr
 | `-32010` | 协议核 `axum_jsonrpc` | batch 过长（jsonrpsee 对齐） |
 | `-32001..-32009`（跳过 `-32007`） | 业务（如 `identity_contract`） | 领域错误 |
 | `-32020..-32029` | `http_auth` | authn：缺 token / 无效 / 吊销 / 缓存不可用；**`authn_kit` 不感知 RPC** |
-| `-32030..-32039` | `file_contract` | file：attachment（`-32032..-32034`）；`-32035` 仅 test 后端 / 未配置本地 presign；`-32030/31` 已退役勿复用 |
+| `-32030..-32039` | `file_contract` | file：attachment（`-32032..-32034`）；`-32035` 仅 test 后端 / 未配置本地 presign；`-32036` rate limited；`-32030/31` 已退役勿复用 |
 
 - 基础设施失败（DB 驱动等）→ **`-32603`**（`http_server` 经 `set_internal_error_message` 用 locale 渲染 message）
 - **不要**把业务详情塞进 `error.data`（关联 id 走响应头 `x-request-id`，成功/失败都回）

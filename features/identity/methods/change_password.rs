@@ -1,3 +1,4 @@
+use app_state::AuthRateLimit;
 use axum::extract::State;
 use axum_jsonrpc::{ValidatedParams, rpc};
 use cache_kit::Cache;
@@ -11,6 +12,7 @@ use toasty::Db;
 use validify::Validate;
 
 use crate::shared::hashed_password::HashedPassword;
+use crate::shared::rate_limit::enforce_change_password_subject;
 use crate::shared::token_ops;
 
 #[derive(Debug, Deserialize, JsonSchema, Validate)]
@@ -31,14 +33,16 @@ pub struct ChangePasswordRequest {
 
 /// 修改调用者的密码并吊销所有会话
 #[rpc("identity.account.change_password")]
-#[tracing::instrument(skip(db, cache, token_helper, request))]
+#[tracing::instrument(skip(db, cache, auth_rate, token_helper, request))]
 pub async fn change_password(
     AuthedAccount(caller): AuthedAccount,
     State(mut db): State<Db>,
     State(cache): State<Cache>,
+    State(auth_rate): State<AuthRateLimit>,
     State(token_helper): State<TokenHelper>,
     ValidatedParams(request): ValidatedParams<ChangePasswordRequest>,
 ) -> Result<()> {
+    enforce_change_password_subject(&cache, auth_rate, caller).await?;
     if request.old_password.as_str() == request.new_password.as_str() {
         return Err(IdentityError::AccountPasswordUnchanged.into());
     }

@@ -39,6 +39,7 @@ check-fast crate="identity":
 
 layering:
     python3 scripts/check_layering.py
+    python3 scripts/check_module_order.py
 
 # 拉取 /openrpc.json → .clients/（Swift/Kotlin/Dart/TS；api 需在听；已有缓存可只跑后半段）
 gen-clients url="http://127.0.0.1:9000/openrpc.json":
@@ -69,6 +70,7 @@ docs-min:
 
 pre_commit:
     python3 scripts/check_layering.py
+    python3 scripts/check_module_order.py
     cargo machete
     cargo fixrs
     cargo fmt --all

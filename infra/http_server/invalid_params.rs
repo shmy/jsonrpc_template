@@ -161,12 +161,11 @@ mod render_tests {
 
     #[test]
     fn validation_prefixes_safe_location() {
-        let msg = render_validation_params("password_invalid_length", "password");
-        assert_eq!(msg, "password: Password must be 8-64 characters long");
-        let nested = render_validation_params("password_invalid_length", "/user/password");
-        assert_eq!(
-            nested,
-            "user.password: Password must be 8-64 characters long"
-        );
+        // 用 shared.ftl 通用 key（业务校验文案在 feature FTL，本测只覆盖 location 前缀）。
+        let msg = render_validation_params("invalid_params_invalid_value_root", "password");
+        assert_eq!(msg, "password: Invalid params value");
+        let nested =
+            render_validation_params("invalid_params_invalid_value_root", "/user/password");
+        assert_eq!(nested, "user.password: Invalid params value");
     }
 }

@@ -39,6 +39,42 @@ pub fn is_safe_object_path(path: &str) -> bool {
             .all(|seg| !seg.is_empty() && seg != ".." && seg != ".")
 }
 
+/// 去掉 `?` / `#` 及之后（公网 URL 查询串 / fragment）。
+#[inline]
+fn trim_query_fragment(path: &str) -> &str {
+    path.split(['?', '#']).next().unwrap_or(path)
+}
+
+/// 配置 domain 的 http↔https 对偶（无 scheme 则 `None`）。
+fn alt_scheme_domain(domain: &str) -> Option<String> {
+    if let Some(rest) = domain.strip_prefix("http://") {
+        Some(format!("https://{rest}"))
+    } else if let Some(rest) = domain.strip_prefix("https://") {
+        Some(format!("http://{rest}"))
+    } else {
+        None
+    }
+}
+
+/// 剥 `{domain}/`；domain 的 http/https 对偶也试一次。未匹配 → `None`。
+fn try_strip_domain_prefix<'a>(domain: &str, path: &'a str) -> Option<&'a str> {
+    let prefix = format!("{domain}/");
+    if let Some(rest) = path.strip_prefix(&prefix) {
+        return Some(rest);
+    }
+    if let Some(alt) = alt_scheme_domain(domain) {
+        let alt_prefix = format!("{alt}/");
+        if let Some(rest) = path.strip_prefix(&alt_prefix) {
+            return Some(rest);
+        }
+    }
+    None
+}
+
+fn is_absolute_http_url(path: &str) -> bool {
+    path.starts_with("http://") || path.starts_with("https://")
+}
+
 /// staging 对象：以 [`STAGING_PREFIX`] 开头且为安全相对 path。
 #[inline]
 #[must_use]
@@ -133,13 +169,26 @@ impl BackendCore {
     }
 
     /// 从公网 URL 还原存储路径：剥离 `{domain}/` 前缀；非本站 URL 原样返回。
+    ///
+    /// - `http` / `https` 与配置 domain 可互换匹配（脏数据 scheme 不一致）
+    /// - **本站**剥前缀后、或**相对 object key**：去掉 `?` / `#`（`?w=` 脏数据）
+    /// - **真外链**保留 query/fragment（签名 CDN 等，勿在 `keep_current` 时改写）
     #[inline]
     pub(crate) fn strip_public_url_prefix<'a>(&self, path: &'a str) -> Cow<'a, str> {
-        let prefix = format!("{}/", self.domain);
-        if let Some(stripped) = path.strip_prefix(&prefix) {
-            Cow::Owned(stripped.to_string())
+        let trimmed = path.trim();
+        let key = if let Some(rest) = try_strip_domain_prefix(&self.domain, trimmed) {
+            trim_query_fragment(rest)
+        } else if is_absolute_http_url(trimmed) {
+            // 真外链：只 trim 空白，保留 ?sig= / ?w=
+            trimmed
         } else {
+            // 相对 key：去 query（脏 `2026/01/a.webp?w=256`）
+            trim_query_fragment(trimmed)
+        };
+        if key == path {
             Cow::Borrowed(path)
+        } else {
+            Cow::Owned(key.to_string())
         }
     }
 
@@ -211,8 +260,16 @@ impl BackendCore {
     }
 
     /// 批量删除（空列表安全）。
+    ///
+    /// list 返回的目录 path 常带尾 `/`；校验前剥掉再套 [`is_safe_object_path`]。
     #[tracing::instrument]
     pub(crate) async fn delete_many(&self, paths: Vec<String>) -> Result<()> {
+        for path in &paths {
+            let trimmed = path.trim_end_matches('/');
+            if trimmed.is_empty() || !is_safe_object_path(trimmed) {
+                return Err(BlobError::UnsafeObjectPath.into());
+            }
+        }
         self.op.delete_iter(paths).await?;
         Ok(())
     }
@@ -220,6 +277,9 @@ impl BackendCore {
     /// 移动对象：优先 `rename`；不支持时退化为读+写+删（三端行为对齐）。
     #[tracing::instrument]
     pub(crate) async fn mv(&self, from: &str, to: &str) -> Result<()> {
+        if !is_safe_object_path(from) || !is_safe_object_path(to) {
+            return Err(BlobError::UnsafeObjectPath.into());
+        }
         if from == to {
             return Ok(());
         }
@@ -295,6 +355,9 @@ impl BackendCore {
     /// 读取整个对象；不存在返回 `Ok(None)`（供静态文件服务区分 404 与故障）。
     #[tracing::instrument(skip(self))]
     pub(crate) async fn read(&self, path: &str) -> Result<Option<ReadOutput>> {
+        if !is_safe_object_path(path) {
+            return Err(BlobError::UnsafeObjectPath.into());
+        }
         match self.op.read(path).await {
             Ok(buffer) => Ok(Some(ReadOutput {
                 bytes: buffer.to_vec(),

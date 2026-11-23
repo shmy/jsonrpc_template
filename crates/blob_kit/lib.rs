@@ -314,6 +314,13 @@ mod tests {
     use tempfile::NamedTempFile;
     use tokio::fs::File as TokioFile;
 
+    fn assert_unsafe_path(err: &rootcause::Report) {
+        assert!(
+            err.downcast_current_context::<BlobError>()
+                .is_some_and(|e| matches!(e, BlobError::UnsafeObjectPath))
+        );
+    }
+
     #[tokio::test]
     async fn write_rejects_unsafe_path() {
         let blob = Blob::new_for_test().await.expect("create test blob");
@@ -321,9 +328,64 @@ mod tests {
             .write("../escape.txt", Cursor::new(b"x"))
             .await
             .expect_err("reject");
-        assert!(
-            err.downcast_current_context::<BlobError>()
-                .is_some_and(|e| matches!(e, BlobError::UnsafeObjectPath))
+        assert_unsafe_path(&err);
+    }
+
+    #[tokio::test]
+    async fn read_delete_mv_reject_unsafe_path() {
+        let blob = Blob::new_for_test().await.expect("create test blob");
+        assert_unsafe_path(&blob.read("../escape.txt").await.expect_err("read"));
+        assert_unsafe_path(
+            &blob
+                .delete_many(vec!["../escape.txt".into()])
+                .await
+                .expect_err("delete"),
+        );
+        assert_unsafe_path(
+            &blob
+                .mv("staging/ok.txt", "../escape.txt")
+                .await
+                .expect_err("mv to"),
+        );
+        assert_unsafe_path(
+            &blob
+                .mv("../escape.txt", "staging/ok.txt")
+                .await
+                .expect_err("mv from"),
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_many_allows_trailing_slash_rejects_dotdot() {
+        let blob = Blob::new_for_test().await.expect("create test blob");
+        blob.delete_many(vec![]).await.expect("empty ok");
+        // list 风格目录 path（尾 `/`）校验应通过。
+        blob.delete_many(vec!["staging/2025/".into()])
+            .await
+            .expect("trailing slash dir");
+        assert_unsafe_path(
+            &blob
+                .delete_many(vec!["../escape/".into()])
+                .await
+                .expect_err("dotdot"),
+        );
+    }
+
+    #[tokio::test]
+    async fn strip_public_url_scheme_alt_and_query() {
+        let blob = Blob::new_for_test().await.expect("create test blob");
+        assert_eq!(
+            blob.strip_public_url_prefix("https://test.local/files/staging/a.webp?w=256"),
+            "staging/a.webp"
+        );
+        assert_eq!(
+            blob.strip_public_url_prefix("staging/a.webp?w=128"),
+            "staging/a.webp"
+        );
+        // 真外链保留 query（签名 CDN）；勿在 keep_current 时剥掉。
+        assert_eq!(
+            blob.strip_public_url_prefix("https://cdn.example/a.webp?sig=abc&w=64"),
+            "https://cdn.example/a.webp?sig=abc&w=64"
         );
     }
 

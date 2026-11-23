@@ -1339,6 +1339,7 @@ name = "file"
 version = "0.1.0"
 dependencies = [
  "app_state",
+ "authn_kit",
  "axum",
  "axum_jsonrpc",
  "blob_kit",

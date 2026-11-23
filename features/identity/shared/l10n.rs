@@ -63,6 +63,30 @@ mod tests {
     }
 
     #[test]
+    fn validation_param_keys_exist() {
+        ensure_locales_for_test();
+        for key in [
+            "password_invalid_length",
+            "password_control_chars",
+            "refresh_token_invalid_length",
+            "phone_invalid_length",
+            "phone_invalid_format",
+            "name_invalid_length",
+            "avatar_invalid_length",
+            "remark_invalid_length",
+        ] {
+            assert!(
+                try_translate("en-US", key).is_some(),
+                "missing en-US key `{key}`"
+            );
+            assert!(
+                try_translate("zh-CN", key).is_some(),
+                "missing zh-CN key `{key}`"
+            );
+        }
+    }
+
+    #[test]
     fn identity_error_maps_to_rpc_code() {
         ensure_locales_for_test();
         let report = Report::from(IdentityError::AccountNotFound);

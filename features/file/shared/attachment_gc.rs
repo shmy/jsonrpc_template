@@ -18,7 +18,7 @@ pub async fn run_once(db: &mut Db, blob: &Blob) -> Result<u64> {
         return Ok(0);
     }
     let candidates = file_attachment::list_gc_candidates(db).await?;
-    let in_use = file_attachment::collect_all_in_use(db).await?;
+    let in_use = file_attachment::collect_all_in_use(db, blob).await?;
     let to_purge = file_attachment::filter_gc_candidates(candidates, &in_use);
     let mut deleted = 0_u64;
     for path in to_purge {

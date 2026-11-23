@@ -120,8 +120,8 @@ pub struct ServerCli {
 
 #[derive(Clone, Debug, clap::Args)]
 pub struct RateLimitCli {
-    /// login/refresh Redis IP sliding-window rate (hits per second baseline).
-    /// 全站限流交给网关；应用内仅贵路径 method 调用 `AuthRateLimit::allow`。
+    /// 贵路径 Redis 滑动窗 baseline（hits/s）：login/refresh 按 IP；
+    /// change_password / file.presign 按 subject。全站限流交给网关。
     #[arg(
         id = "rate_limit_auth_per_second",
         long = "rate-limit-auth-per-second",
@@ -130,7 +130,7 @@ pub struct RateLimitCli {
     )]
     pub auth_per_second: u32,
 
-    /// login/refresh Redis IP sliding-window burst (max hits in the derived window).
+    /// 同上滑动窗 burst（窗内硬上限）。
     #[arg(
         id = "rate_limit_auth_burst",
         long = "rate-limit-auth-burst",

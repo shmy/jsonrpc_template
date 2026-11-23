@@ -1,10 +1,10 @@
-//! Method 内 Redis 限流（login/refresh）：IP 滑动窗 + 手机号固定窗。
-//! 配额均为进程级配置（`app_state`），非硬编码。
+//! Method 内 Redis 限流（login/refresh IP、login 手机号、change_password subject）。
+//! 配额均为进程级配置（`app_state` / `RATE_LIMIT_AUTH_*` 等），非硬编码。
 
 use app_state::{AuthRateLimit, LoginPhoneRate};
 use cache_kit::Cache;
 use http_extractors::ClientIp;
-use identity_contract::IdentityError;
+use identity_contract::{Id, IdentityError};
 use rootcause::Result;
 
 use crate::shared::token_ops::map_cache_err;
@@ -21,6 +21,7 @@ fn login_phone_key(phone: &str) -> String {
 pub(crate) enum AuthFace {
     Login,
     Refresh,
+    ChangePassword,
 }
 
 impl AuthFace {
@@ -28,12 +29,21 @@ impl AuthFace {
         match self {
             Self::Login => "login",
             Self::Refresh => "refresh",
+            Self::ChangePassword => "change_password",
         }
     }
 }
 
 fn auth_ip_key(face: AuthFace, ip: &ClientIp) -> String {
     format!("identity:{}:ip:{}", face.key(), ip.rate_limit_key())
+}
+
+fn change_password_subject_key(subject: Id) -> String {
+    format!(
+        "identity:{}:subject:{}",
+        AuthFace::ChangePassword.key(),
+        subject
+    )
 }
 
 fn enforce(allowed: Result<bool>, rejected: IdentityError) -> Result<()> {
@@ -63,4 +73,17 @@ pub(crate) async fn enforce_login_phone(
     rejected: IdentityError,
 ) -> Result<()> {
     enforce(limit.allow(cache, &login_phone_key(phone)).await, rejected)
+}
+
+/// change_password：按 subject 滑动窗（`RATE_LIMIT_AUTH_*`；防盗用 access 撞旧密）。
+pub(crate) async fn enforce_change_password_subject(
+    cache: &Cache,
+    auth_rate: AuthRateLimit,
+    subject: Id,
+) -> Result<()> {
+    let key = change_password_subject_key(subject);
+    enforce(
+        auth_rate.allow(cache, &key).await,
+        IdentityError::AuthRateLimited,
+    )
 }

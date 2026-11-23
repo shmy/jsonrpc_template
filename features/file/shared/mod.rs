@@ -9,4 +9,5 @@ pub(crate) mod http_error;
 pub(crate) mod image_derive;
 pub(crate) mod l10n;
 mod path_consistency;
+pub(crate) mod rate_limit;
 pub(crate) mod staging_gc;

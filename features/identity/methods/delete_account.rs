@@ -1,5 +1,6 @@
 use axum::extract::State;
 use axum_jsonrpc::{Params, rpc};
+use blob_kit::Blob;
 use cache_kit::Cache;
 use http_auth::AuthedAccount;
 use identity_contract::Id;
@@ -20,10 +21,11 @@ pub struct DeleteAccountRequest {
 
 /// 删除账号（本人或 privileged 删他人；特权账号禁删）
 #[rpc("identity.account.delete")]
-#[tracing::instrument(skip(db, cache, token_helper, request))]
+#[tracing::instrument(skip(db, blob, cache, token_helper, request))]
 pub async fn delete_account(
     AuthedAccount(caller): AuthedAccount,
     State(mut db): State<Db>,
+    State(blob): State<Blob>,
     State(cache): State<Cache>,
     State(token_helper): State<TokenHelper>,
     Params(request): Params<DeleteAccountRequest>,
@@ -31,13 +33,13 @@ pub async fn delete_account(
     let account = load_for_delete(&mut db, caller, request.id).await?;
     let old_avatar = account.avatar.clone();
     if let Some(path) = old_avatar.as_deref() {
-        file_attachment::detach_column_for_delete(&mut db, path).await?;
+        file_attachment::detach_column_for_delete(&mut db, &blob, path).await?;
     }
     if let Err(err) = account.delete().exec(&mut db).await {
         // 删行失败：回滚刚扣减的旧头像引用（ref_count / tombstone 已被动过），
         // 否则行仍引用的对象计数失真（in-use 安全网虽能兜底防误删，勿依赖）。
         if let Some(path) = old_avatar.as_deref() {
-            file_attachment::reattach_best_effort(&mut db, path).await;
+            file_attachment::reattach_best_effort(&mut db, &blob, path).await;
         }
         return Err(err.into());
     }

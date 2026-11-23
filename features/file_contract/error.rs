@@ -9,6 +9,7 @@ pub mod codes {
     pub const ATTACHMENT_NOT_FOUND: i32 = -32033;
     pub const ATTACHMENT_NOT_REGISTERED: i32 = -32034;
     pub const PRESIGN_UNSUPPORTED: i32 = -32035;
+    pub const RATE_LIMITED: i32 = -32036;
 }
 
 /// Domain-facing file / attachment errors.
@@ -28,6 +29,9 @@ pub enum FileError {
     /// 预签名：当前后端无直传语义（如 test 内存后端 / 未配置本地 HMAC）。
     #[error("blob_presign_unsupported")]
     PresignUnsupported,
+    /// 贵路径（如 `file.presign`）配额耗尽。
+    #[error("file_rate_limited")]
+    RateLimited,
 }
 
 impl FileError {
@@ -38,6 +42,7 @@ impl FileError {
             Self::AttachmentNotFound => codes::ATTACHMENT_NOT_FOUND,
             Self::AttachmentNotRegistered => codes::ATTACHMENT_NOT_REGISTERED,
             Self::PresignUnsupported => codes::PRESIGN_UNSUPPORTED,
+            Self::RateLimited => codes::RATE_LIMITED,
         }
     }
 
@@ -48,6 +53,7 @@ impl FileError {
             Self::AttachmentNotFound => "file_attachment_not_found",
             Self::AttachmentNotRegistered => "file_attachment_not_registered",
             Self::PresignUnsupported => "blob_presign_unsupported",
+            Self::RateLimited => "file_rate_limited",
         }
     }
 }
@@ -65,6 +71,7 @@ mod tests {
             FileError::AttachmentNotFound,
             FileError::AttachmentNotRegistered,
             FileError::PresignUnsupported,
+            FileError::RateLimited,
         ];
         for err in cases {
             assert_eq!(err.l10n_key(), err.to_string());
@@ -78,6 +85,7 @@ mod tests {
             FileError::AttachmentNotFound,
             FileError::AttachmentNotRegistered,
             FileError::PresignUnsupported,
+            FileError::RateLimited,
         ] {
             let code = err.rpc_code();
             assert!((-32039..=-32030).contains(&code), "{code}");

@@ -42,4 +42,27 @@ mod tests {
             "Invalid attachment path; use the staging path returned by the upload API."
         );
     }
+
+    #[test]
+    fn blob_and_rate_limit_keys_exist() {
+        use locale::try_translate;
+
+        ensure_locales_for_test();
+        for key in [
+            "file_rate_limited",
+            "blob_presign_unsupported",
+            "blob_not_staging_path",
+            "blob_unsafe_object_path",
+            "blob_object_not_found",
+        ] {
+            assert!(
+                try_translate("en-US", key).is_some(),
+                "missing en-US key `{key}`"
+            );
+            assert!(
+                try_translate("zh-CN", key).is_some(),
+                "missing zh-CN key `{key}`"
+            );
+        }
+    }
 }

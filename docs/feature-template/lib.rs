@@ -6,10 +6,10 @@ use http_routing::PrivateRpc;
 use modrun::Module;
 
 mod methods;
-// mod shared; // 有 locale / 跨 method 逻辑时取消注释
+mod shared; // 有 locale / 跨 method 逻辑时保留；见 shared/l10n.rs
 
 pub fn module() -> Module {
-    // shared::l10n::register_FEATURE_locale_bundle();
+    shared::l10n::register_FEATURE_locale_bundle();
     Module::builder("FEATURE_NAME").provide_group_result(provide_private_methods)
 }
 

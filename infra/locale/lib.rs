@@ -283,28 +283,12 @@ mod tests {
             "Duplicate field `password`"
         );
         assert_eq!(
-            translate("en-US", "password_invalid_length"),
-            "Password must be 8-64 characters long"
-        );
-        assert_eq!(
-            translate("zh-CN", "password_invalid_length"),
-            "密码长度须为 8-64 个字符"
-        );
-        assert_eq!(
             translate("en-US", "invalid_params_shape"),
             "Params must be a JSON array or object"
         );
         assert_eq!(
             translate("zh-CN", "invalid_params_invalid_type_root"),
             "参数类型无效"
-        );
-        assert_eq!(
-            translate("en-US", "phone_invalid_length"),
-            "Phone must be exactly 11 digits"
-        );
-        assert_eq!(
-            translate("zh-CN", "phone_invalid_format"),
-            "手机号须为有效的中国大陆手机号（13-19 开头）"
         );
         assert_eq!(translate("zh-CN", "parse_error"), "解析错误");
     }
