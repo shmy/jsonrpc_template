@@ -51,7 +51,7 @@
 - 规范 introspection（`rpc.discover` 等）——已有 OpenRPC 可替代
 - TLS 终止（默认交给反向代理）
 - 多 cache 后端、双组合根（独立 worker 二进制）
-- COS 数据万象 / 独立图片服务（当前 fs 同进程 `?w=`）
+- COS 数据万象 / 独立图片服务（当前 fs 同进程 `?s=`）
 - MFA / 多设备会话 / OIDC
 - 常见/breached 密码 denylist
 - 账号软删 / 独立审计事件表
@@ -60,9 +60,9 @@
 ## 已完成（blob / file / clients）
 
 - [x] `blob_kit` + `infra/blob`（fs / 腾讯 COS）；上传仅 `file.presign`
-- [x] （fs）`PUT /files/presigned` + `GET /files/*`（可选 `?w=128|256|512|1024` 派生 WebP 落盘缓存）
+- [x] （fs）`PUT /files/presigned` + `GET /files/*`（可选 `?s=128|256|512|1024` 派生 WebP 落盘缓存）
 - [x] `infra/file_attachment` + identity avatar + Lifecycle GC
-- [x] `image_kit` + fs URL 派生缩略图（`*_w{n}.webp` 缓存；旧 `_sm.webp` GC 仍清）
+- [x] `image_kit` + fs URL 派生缩略图（`*_s{n}.webp` 缓存；旧 `_sm.webp` GC 仍清）
 - [x] 多语言客户端生成 + CI `clients-check`（OpenRPC 漂移 + bun session.test）
 
 ## 验收标准（起步可用）

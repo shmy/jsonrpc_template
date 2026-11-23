@@ -29,7 +29,7 @@ cargo run -p api
 | `GET` | `/healthz` | 存活探测，返回 `OK` |
 | `GET` | `/readyz` | 就绪探测：Postgres 可取连接且 Redis `probe` 成功 → `200`，否则 `503` |
 | `PUT` | `/files/presigned` | `blob-fs` 本地预签名直传（HMAC query；COS 不挂，客户端 PUT 到 Cos URL） |
-| `GET` | `/files/{*path}` | `blob-fs`：dated 路径白名单；正式对象可选 `?w=128\|256\|512\|1024` 按需派生 WebP（`*_w{n}.webp`；`staging/` 禁止）；可信扩展可内联，其余 `Content-Disposition: attachment`（COS 不挂） |
+| `GET` | `/files/{*path}` | `blob-fs`：dated 路径白名单；正式对象可选 `?s=128\|256\|512\|1024` 按需派生 WebP（`*_s{n}.webp`；`staging/` 禁止）；可信扩展可内联，其余 `Content-Disposition: attachment`（COS 不挂） |
 
 ### 健康检查
 
@@ -177,11 +177,11 @@ crates/
   axum_jsonrpc_openrpc  # OpenRPC 文档生成与 /openrpc.json
   blob_kit              # OpenDAL 对象存储门面（fs / 腾讯 COS）
   cache_kit             # Redis Cache 门面
-  image_kit             # 图像派生（decode → max-edge → webp；供 fs `?w=`）
+  image_kit             # 图像派生（decode → max-edge → webp；供 fs `?s=`）
   jwt_kit               # HS256 TokenHelper
   trace_kit             # tracing 初始化 / trace_id / OTLP metrics
 features/
-  file                  # file.presign +（fs）PUT/回源/`?w=`（shared/image_derive）+ GC
+  file                  # file.presign +（fs）PUT/回源/`?s=`（shared/image_derive）+ GC
   file_contract         # BlobObject / FileError / derived path 约定（staging 禁派生）
   identity              # 示范业务：account CRUD + login/refresh/logout（avatar 经 file_attachment）
   identity_contract     # Account 模型与领域错误
@@ -189,7 +189,7 @@ features/
 infra/
   app_state             # AppState（Db + Cache + Blob + TokenHelper + …）
   blob                  # OpenDAL Operator provide（feature：fs / cos）
-  file_attachment       # staging claim / commit / attach / detach；thumb URL `?w=`
+  file_attachment       # staging claim / commit / attach / detach；thumb URL `?s=`
   cache                 # Redis 连接池 provide
   config                # Cli / dotenv / TrustedProxies
   http_auth             # Bearer、软/强制鉴权、AuthedAccount

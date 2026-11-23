@@ -50,7 +50,7 @@ pub fn module() -> Module {
     module
 }
 
-/// 本地 fs：`GET /files/*`（可选 `?w=` → `shared::image_derive`）+ 路径白名单；
+/// 本地 fs：`GET /files/*`（可选 `?s=` → `shared::image_derive`）+ 路径白名单；
 /// 不可信扩展强制 `Content-Disposition: attachment`。`PUT /files/presigned` 仍走 HMAC。
 #[cfg(feature = "blob-fs")]
 fn public_routes(cli: Cli) -> PublicRouter {

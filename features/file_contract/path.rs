@@ -7,19 +7,23 @@ use tempoid::TempoId;
 /// 变更时请同步 `blob_kit::STAGING_PREFIX`，并由 `file` 单测断言相等。
 pub const STORAGE_DIR_PREFIX: &str = "staging/";
 
-/// URL 派生默认最长边（`?w=` 省略时客户端约定；缓存文件 `_w{DEFAULT}.webp`）。
-pub const DEFAULT_DERIVE_WIDTH: u32 = 256;
+/// URL 派生默认最长边（`?s=` 默认档；缓存文件 `_s{DEFAULT}.webp`）。
+pub const DEFAULT_DERIVE_SIZE: u32 = 256;
 
 /// 允许的派生最长边白名单（防任意尺寸打满 CPU / 缓存爆炸）。
 ///
-/// `?w=` 语义为**最长边上界**：只缩小、不放大；原图已更短则尺寸不变（仍可能转 WebP）。
-pub const DERIVE_WIDTHS: &[u32] = &[128, 256, 512, 1024];
+/// `?s=` 语义为**最长边上界**（size）：只缩小、不放大；原图已更短则尺寸不变（仍可能转 WebP）。
+pub const DERIVE_SIZES: &[u32] = &[128, 256, 512, 1024];
 
-/// 与 [`DERIVE_WIDTHS`] 同步的提示串（HTTP 400 等）；增删档位时改一处即可。
-pub const DERIVE_WIDTHS_HINT: &str = "128|256|512|1024";
+/// 与 [`DERIVE_SIZES`] 同步的提示串（HTTP 400 等）；增删档位时改一处即可。
+pub const DERIVE_SIZES_HINT: &str = "128|256|512|1024";
 
 /// 旧版预生成后缀（job 时代 `*_sm.webp`）；GC 仍会清。
 pub const LEGACY_THUMB_SUFFIX: &str = "_sm";
+/// 旧 query `?w=` 时代的缓存后缀前缀 `_w{n}`；GC / 识别仍支持。
+pub const LEGACY_DERIVE_MARK: &str = "_w";
+/// 当前缓存后缀前缀：`_s{n}.webp`。
+pub const DERIVE_MARK: &str = "_s";
 pub const DERIVE_EXTENSION: &str = "webp";
 
 /// 可自动派生的图片扩展名（小写、无点）；视频等不在此列。
@@ -49,58 +53,58 @@ pub fn is_image_extension(ext: &str) -> bool {
     IMAGE_EXTENSIONS.iter().any(|e| ext.eq_ignore_ascii_case(e))
 }
 
-/// `w` 是否在 [`DERIVE_WIDTHS`] 白名单。
+/// `s` 是否在 [`DERIVE_SIZES`] 白名单。
 #[must_use]
-pub fn is_allowed_derive_width(width: u32) -> bool {
-    DERIVE_WIDTHS.contains(&width)
+pub fn is_allowed_derive_size(size: u32) -> bool {
+    DERIVE_SIZES.contains(&size)
 }
 
-/// `?w=` 解析结果：区分「非法档」与「此对象不可派生」。
+/// `?s=` 解析结果：区分「非法档」与「此对象不可派生」。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeriveRequest {
     /// 可派生，值为缓存 object key。
     CachePath(String),
-    /// `w` 不在白名单 → HTTP 应 400。
-    BadWidth,
-    /// staging / 非图 / 已是派生文件等 → 忽略 `w`，回原图。
+    /// `s` 不在白名单 → HTTP 应 400。
+    BadSize,
+    /// staging / 非图 / 已是派生文件等 → 忽略 `s`，回原图。
     NotApplicable,
 }
 
-/// 决议 `object_path` + `w`：非法档 / 不适用 / 缓存 key。
+/// 决议 `object_path` + `s`：非法档 / 不适用 / 缓存 key。
 #[must_use]
-pub fn resolve_derive_request(object_path: &str, width: u32) -> DeriveRequest {
-    if !is_allowed_derive_width(width) {
-        return DeriveRequest::BadWidth;
+pub fn resolve_derive_request(object_path: &str, size: u32) -> DeriveRequest {
+    if !is_allowed_derive_size(size) {
+        return DeriveRequest::BadSize;
     }
-    match derived_object_path(object_path, width) {
+    match derived_object_path(object_path, size) {
         Some(path) => DeriveRequest::CachePath(path),
         None => DeriveRequest::NotApplicable,
     }
 }
 
-/// 由对象 path + 最长边派生缓存 object key：`…/stem_w{width}.webp`。
+/// 由对象 path + 最长边派生缓存 object key：`…/stem_s{size}.webp`。
 ///
-/// - `staging/` / 非图片 / 已是派生缓存 / 非法 width / 外链 → `None`
-/// - `2026/01/abc.jpg` + `256` → `Some("2026/01/abc_w256.webp")`
+/// - `staging/` / 非图片 / 已是派生缓存 / 非法 size / 外链 → `None`
+/// - `2026/01/abc.jpg` + `256` → `Some("2026/01/abc_s256.webp")`
 #[must_use]
-pub fn derived_object_path(object_path: &str, width: u32) -> Option<String> {
-    if width == 0 || !is_allowed_derive_width(width) {
+pub fn derived_object_path(object_path: &str, size: u32) -> Option<String> {
+    if size == 0 || !is_allowed_derive_size(size) {
         return None;
     }
     let (parent, stem, _) = formal_image_parts(object_path)?;
     Some(join_object(
         parent,
-        &format!("{stem}_w{width}.{DERIVE_EXTENSION}"),
+        &format!("{stem}{DERIVE_MARK}{size}.{DERIVE_EXTENSION}"),
     ))
 }
 
-/// 默认档缓存 path（[`DEFAULT_DERIVE_WIDTH`]）。
+/// 默认档缓存 path（[`DEFAULT_DERIVE_SIZE`]）。
 #[must_use]
 pub fn thumb_object_path(object_path: &str) -> Option<String> {
-    derived_object_path(object_path, DEFAULT_DERIVE_WIDTH)
+    derived_object_path(object_path, DEFAULT_DERIVE_SIZE)
 }
 
-/// GC：原图对应的全部派生缓存 key（白名单各档 + 旧 `_sm.webp`）。
+/// GC：原图对应的全部派生缓存 key（当前 `_s*` + 旧 `_w*` + 旧 `_sm.webp`）。
 ///
 /// `staging/` 下不会生成派生，故返回空。
 #[must_use]
@@ -108,11 +112,16 @@ pub fn derived_cache_paths(object_path: &str) -> Vec<String> {
     let Some((parent, stem, _)) = formal_image_parts(object_path) else {
         return Vec::new();
     };
-    let mut out = Vec::with_capacity(DERIVE_WIDTHS.len() + 1);
-    for &w in DERIVE_WIDTHS {
+    let mut out = Vec::with_capacity(DERIVE_SIZES.len() * 2 + 1);
+    for &s in DERIVE_SIZES {
         out.push(join_object(
             parent,
-            &format!("{stem}_w{w}.{DERIVE_EXTENSION}"),
+            &format!("{stem}{DERIVE_MARK}{s}.{DERIVE_EXTENSION}"),
+        ));
+        // 旧 ?w= 时代落盘
+        out.push(join_object(
+            parent,
+            &format!("{stem}{LEGACY_DERIVE_MARK}{s}.{DERIVE_EXTENSION}"),
         ));
     }
     out.push(join_object(
@@ -151,8 +160,11 @@ fn is_derived_stem(stem: &str, ext: &str) -> bool {
     if stem.ends_with(LEGACY_THUMB_SUFFIX) {
         return true;
     }
-    // `_w128` / `_w256` / …
-    stem.rsplit_once("_w")
+    ends_with_size_mark(stem, DERIVE_MARK) || ends_with_size_mark(stem, LEGACY_DERIVE_MARK)
+}
+
+fn ends_with_size_mark(stem: &str, mark: &str) -> bool {
+    stem.rsplit_once(mark)
         .is_some_and(|(_, rest)| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()))
 }
 
@@ -208,10 +220,11 @@ mod tests {
     fn derived_object_path_for_images() {
         assert_eq!(
             derived_object_path("2026/01/abc.jpg", 256).as_deref(),
-            Some("2026/01/abc_w256.webp")
+            Some("2026/01/abc_s256.webp")
         );
         assert_eq!(thumb_object_path("staging/2026/01/abc.PNG"), None);
         assert_eq!(derived_object_path("staging/2026/01/abc.jpg", 256), None);
+        assert_eq!(derived_object_path("2026/01/abc_s256.webp", 128), None);
         assert_eq!(derived_object_path("2026/01/abc_w256.webp", 128), None);
         assert_eq!(derived_object_path("2026/01/abc_sm.webp", 256), None);
         assert_eq!(derived_object_path("2026/01/clip.mp4", 256), None);
@@ -220,14 +233,14 @@ mod tests {
     }
 
     #[test]
-    fn resolve_derive_request_distinguishes_bad_width() {
+    fn resolve_derive_request_distinguishes_bad_size() {
         assert_eq!(
             resolve_derive_request("2026/01/abc.jpg", 256),
-            DeriveRequest::CachePath("2026/01/abc_w256.webp".into())
+            DeriveRequest::CachePath("2026/01/abc_s256.webp".into())
         );
         assert_eq!(
             resolve_derive_request("2026/01/abc.jpg", 1025),
-            DeriveRequest::BadWidth
+            DeriveRequest::BadSize
         );
         assert_eq!(
             resolve_derive_request("staging/2026/01/abc.jpg", 256),
@@ -237,26 +250,26 @@ mod tests {
             resolve_derive_request("2026/01/clip.mp4", 256),
             DeriveRequest::NotApplicable
         );
-        let expected = DERIVE_WIDTHS
+        let expected = DERIVE_SIZES
             .iter()
             .map(u32::to_string)
             .collect::<Vec<_>>()
             .join("|");
-        assert_eq!(DERIVE_WIDTHS_HINT, expected);
+        assert_eq!(DERIVE_SIZES_HINT, expected);
     }
 
     #[test]
-    fn derived_cache_paths_include_whitelist_and_legacy() {
+    fn derived_cache_paths_include_s_legacy_w_and_sm() {
         let keys = derived_cache_paths("2026/01/abc.jpg");
-        assert!(keys.iter().any(|k| k == "2026/01/abc_w128.webp"));
+        assert!(keys.iter().any(|k| k == "2026/01/abc_s128.webp"));
+        assert!(keys.iter().any(|k| k == "2026/01/abc_s256.webp"));
+        assert!(keys.iter().any(|k| k == "2026/01/abc_s1024.webp"));
         assert!(keys.iter().any(|k| k == "2026/01/abc_w256.webp"));
-        assert!(keys.iter().any(|k| k == "2026/01/abc_w512.webp"));
-        assert!(keys.iter().any(|k| k == "2026/01/abc_w1024.webp"));
         assert!(keys.iter().any(|k| k == "2026/01/abc_sm.webp"));
         assert!(derived_cache_paths("staging/2026/01/abc.jpg").is_empty());
         assert_eq!(
             derived_object_path("2026/01/abc.jpg", 1024).as_deref(),
-            Some("2026/01/abc_w1024.webp")
+            Some("2026/01/abc_s1024.webp")
         );
     }
 }

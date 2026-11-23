@@ -45,7 +45,7 @@ pub(crate) async fn materialize(
     blob: &Blob,
     source_path: &str,
     cache_path: &str,
-    width: u32,
+    size: u32,
     _permit: OwnedSemaphorePermit,
 ) -> Materialize {
     if let Some(outcome) = cache_hit(blob, cache_path).await {
@@ -61,10 +61,10 @@ pub(crate) async fn materialize(
         }
     };
 
-    let rendered = match spawn_blocking(move || image_kit::render_max_edge(&source, width)).await {
+    let rendered = match spawn_blocking(move || image_kit::render_max_edge(&source, size)).await {
         Ok(Ok(bytes)) => bytes,
         Ok(Err(err)) => {
-            tracing::debug!(error = %err, path = source_path, width, "image derive failed");
+            tracing::debug!(error = %err, path = source_path, size, "image derive failed");
             return Materialize::Unprocessable;
         }
         Err(err) => {

@@ -172,7 +172,7 @@ impl BackendCore {
     /// 从公网 URL 还原存储路径：剥离 `{domain}/` 前缀；非本站 URL 原样返回。
     ///
     /// - `http` / `https` 与配置 domain 可互换匹配（脏数据 scheme 不一致）
-    /// - **本站**剥前缀后、或**相对 object key**：去掉 `?` / `#`（`?w=` 脏数据）
+    /// - **本站**剥前缀后、或**相对 object key**：去掉 `?` / `#`（`?s=` 脏数据）
     /// - **真外链**保留 query/fragment（签名 CDN 等，勿在 `keep_current` 时改写）
     #[inline]
     pub(crate) fn strip_public_url_prefix<'a>(&self, path: &'a str) -> Cow<'a, str> {
@@ -180,10 +180,10 @@ impl BackendCore {
         let key = if let Some(rest) = try_strip_domain_prefix(&self.domain, trimmed) {
             trim_query_fragment(rest)
         } else if is_absolute_http_url(trimmed) {
-            // 真外链：只 trim 空白，保留 ?sig= / ?w=
+            // 真外链：只 trim 空白，保留 ?sig= / ?s=
             trimmed
         } else {
-            // 相对 key：去 query（脏 `2026/01/a.webp?w=256`）
+            // 相对 key：去 query（脏 `2026/01/a.webp?s=256`）
             trim_query_fragment(trimmed)
         };
         if key == path {

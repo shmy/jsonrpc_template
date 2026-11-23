@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use blob_kit::{Blob, BlobError, is_staging_object_path, resolve_staging_move_paths};
 use cache_kit::Cache;
-use file_contract::{DEFAULT_DERIVE_WIDTH, FileError, derived_cache_paths, thumb_object_path};
+use file_contract::{DEFAULT_DERIVE_SIZE, FileError, derived_cache_paths, thumb_object_path};
 use identity_contract::Id;
 use rootcause::Result;
 use toasty::sql::query;
@@ -79,18 +79,18 @@ fn clear_attachment_in_use_collectors_for_test() {
 
 /// 由正式 path / 本站 fill_url 派生缩略图公网 URL。
 ///
-/// - **fs**：`…/id.ext?w=256`（同进程按需派生）
-/// - **cos / 其它**：`None`（无同进程 `?w=`；勿拼假参数）
+/// - **fs**：`…/id.ext?s=256`（同进程按需派生；`s` = 最长边）
+/// - **cos / 其它**：`None`（无同进程 `?s=`；勿拼假参数）
 #[must_use]
 pub fn thumb_public_url(blob: &Blob, formal_or_url: &str) -> Option<String> {
-    // 仅 fs 实现 URL 派生；cos 等不要谎称 `?w=`。
+    // 仅 fs 实现 URL 派生；cos 等不要谎称 `?s=`。
     let _ = blob.as_fs()?;
     let stripped = blob.strip_public_url_prefix(formal_or_url.trim());
     let path = stripped.as_ref();
     // staging / 非图 / 已派生 → None（与 `derived_object_path` 对齐）。
     let _ = thumb_object_path(path)?;
     let base = blob.fill_public_url(path);
-    Some(format!("{base}?w={DEFAULT_DERIVE_WIDTH}"))
+    Some(format!("{base}?s={DEFAULT_DERIVE_SIZE}"))
 }
 
 /// pending commit（refcount=0 且未 tombstone）超过此时长可被 AttachmentGc 回收。
@@ -371,12 +371,13 @@ mod tests {
         let mut keys = vec![path.to_string()];
         keys.extend(derived_cache_paths(path));
         assert!(keys.iter().any(|k| k == "2026/01/abc.jpg"));
+        assert!(keys.iter().any(|k| k == "2026/01/abc_s256.webp"));
         assert!(keys.iter().any(|k| k == "2026/01/abc_w256.webp"));
         assert!(keys.iter().any(|k| k == "2026/01/abc_sm.webp"));
         assert!(thumb_object_path("2026/01/clip.mp4").is_none());
         assert_eq!(
             thumb_public_url_shape("http://localhost:8080/files/2026/01/abc.jpg"),
-            Some("http://localhost:8080/files/2026/01/abc.jpg?w=256".into())
+            Some("http://localhost:8080/files/2026/01/abc.jpg?s=256".into())
         );
     }
 
@@ -387,6 +388,6 @@ mod tests {
         if !file_contract::is_image_extension(ext) {
             return None;
         }
-        Some(format!("{path}?w={DEFAULT_DERIVE_WIDTH}"))
+        Some(format!("{path}?s={DEFAULT_DERIVE_SIZE}"))
     }
 }

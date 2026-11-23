@@ -74,8 +74,8 @@ header "X-Content-Type-Options" == "nosniff"
 header "Content-Disposition" not exists
 bytes count > 0
 
-# staging 禁止派生：?w= 忽略，仍回原图（不落 *_w*.webp）
-GET {{base_url}}/files/{{presign_path}}?w=256
+# staging 禁止派生：?s= 忽略，仍回原图（不落 *_s*.webp）
+GET {{base_url}}/files/{{presign_path}}?s=256
 HTTP 200
 [Asserts]
 header "Content-Type" == "image/webp"
@@ -172,12 +172,12 @@ header "X-Content-Type-Options" == "nosniff"
 header "Content-Disposition" not exists
 bytes count > 0
 
-# URL 派生：非法 w → 400
-GET {{formal_avatar}}?w=999
+# URL 派生：非法 s → 400
+GET {{formal_avatar}}?s=999
 HTTP 400
 
 # URL 派生：首次生成 + 缓存命中（均为 image/webp + 长期 Cache-Control）
-GET {{formal_avatar}}?w=256
+GET {{formal_avatar}}?s=256
 HTTP 200
 [Asserts]
 header "Content-Type" == "image/webp"
@@ -185,7 +185,7 @@ header "X-Content-Type-Options" == "nosniff"
 header "Cache-Control" == "public, max-age=31536000, immutable"
 bytes count > 0
 
-GET {{formal_avatar}}?w=256
+GET {{formal_avatar}}?s=256
 HTTP 200
 [Asserts]
 header "Content-Type" == "image/webp"
@@ -301,8 +301,8 @@ Content-Type: video/mp4
 file,fixtures/over-2m.bin;
 HTTP 204
 
-# 非图片带 ?w=：忽略派生，仍按原文件回源（MIME 保留）
-GET {{base_url}}/files/{{large_path}}?w=256
+# 非图片带 ?s=：忽略派生，仍按原文件回源（MIME 保留）
+GET {{base_url}}/files/{{large_path}}?s=256
 HTTP 200
 [Asserts]
 header "Content-Type" == "video/mp4"

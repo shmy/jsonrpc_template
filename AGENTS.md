@@ -11,7 +11,7 @@ Axum + `modrun` 的 **JSON-RPC 2.0 应用脚手架**。
 - **可复用协议核**：`crates/axum_jsonrpc*`（可单独依赖）
 - **应用模板**：`bin/` + `features/` + `infra/`（示范如何挂业务）
 
-默认端点：`POST /jsonrpc`、`GET /openrpc.json`、`GET /livez`、`GET /healthz`、`GET /readyz`、（`blob-fs`）`PUT /files/presigned` + `GET /files/{*path}`（可选 `?w=128|256|512|1024`）；上传走 JSON-RPC `file.presign`。
+默认端点：`POST /jsonrpc`、`GET /openrpc.json`、`GET /livez`、`GET /healthz`、`GET /readyz`、（`blob-fs`）`PUT /files/presigned` + `GET /files/{*path}`（可选 `?s=128|256|512|1024`）；上传走 JSON-RPC `file.presign`。
 
 ## 分层与依赖方向（必须遵守）
 
@@ -30,8 +30,8 @@ bin/api                    # 组合根：CLI supply + module 注册
 | `crates/blob_kit` | OpenDAL 对象存储门面（fs / 腾讯 COS / test-utils） | 低 |
 | `infra/app_state` | 进程级 `AppState`（`Db` + `Cache` + `Blob` + `TokenHelper` + `FromRef`） | 中（加资源时扩展） |
 | `infra/blob` | OpenDAL `Blob` provide（feature `fs` / `cos`；cos 优先；fs→`config/fs`：`BLOB_FS_ROOT` 有默认，`DOMAIN`/`PRESIGN_SECRET` 必填；cos→`config/cos` 必填 `BLOB_S3_*`） | 低 |
-| `infra/file_attachment` | staging claim / commit / attach / detach + **通用绑定编排**（`bind` / `AttachmentWrite` fresh-stale 引用计数协议；跨业务附件实现，勿让 feature 互依；identity avatar 为薄适配示范）；缩略图 URL 约定 `?w=`（见 `thumb_public_url`；**仅正式 path**，`staging/` 禁止派生）；purge 清派生缓存 | 中 |
-| `crates/image_kit` | 纯图像派生（decode → max-edge → webp）；fs `GET ?w=` 内 `spawn_blocking` 调用 | 低 |
+| `infra/file_attachment` | staging claim / commit / attach / detach + **通用绑定编排**（`bind` / `AttachmentWrite` fresh-stale 引用计数协议；跨业务附件实现，勿让 feature 互依；identity avatar 为薄适配示范）；缩略图 URL 约定 `?s=`（见 `thumb_public_url`；**仅正式 path**，`staging/` 禁止派生）；purge 清派生缓存 | 中 |
+| `crates/image_kit` | 纯图像派生（decode → max-edge → webp）；fs `GET ?s=` 内 `spawn_blocking` 调用 | 低 |
 | `infra/cache` | Redis `Cache`（modrun provide） | 低 |
 | `infra/http_auth` | Bearer 解析、软/强制鉴权中间件、`AuthedAccount`；authn 错误码段（`-32020..-32029`）+ FTL + mapper 自持，由 `http_server` seal 前统一注册（**勿**在 feature `module()` 里再注册） | 低 |
 | `infra/http_routing` | `PublicRpc` / `PrivateRpc` / `PublicRouter` / `PrivateRouter` / `ProbeRouter`（无限流中间件） | 低 |
@@ -39,7 +39,7 @@ bin/api                    # 组合根：CLI supply + module 注册
 | `infra/persistence` | DB 连接；提供进程级 `Db`；注册 `*_contract` 模型；仅 `MASTER=true` 时 apply embedded migrations（默认 `false`） | 中 |
 | `infra/http_server` | `Db`+`Cache`+`Blob`+JWT → `AppState`；合并路由、监听、OpenRPC info、中间件、`with_state` | 中 |
 | `crates/{authn_kit,jwt_kit,cache_kit}` | 鉴权 key/错误、HS256 JWT、Redis 缓存门面 | 低 |
-| `features/file` | `file.presign`、（fs）本地预签名 PUT / 回源 / `?w=`（`shared/image_derive` + `endpoints/file_get`）、Lifecycle GC（仅 master） | 中 |
+| `features/file` | `file.presign`、（fs）本地预签名 PUT / 回源 / `?s=`（`shared/image_derive` + `endpoints/file_get`）、Lifecycle GC（仅 master） | 中 |
 | `features/*` | 业务 RPC / HTTP | **高（日常应落这里）** |
 | `features/*_contract` | 跨 feature 契约（如 toasty 模型）；**不**依赖任何 `features/*` 实现 | 中 |
 | `bin/api` | 组装入口（默认 `otlp`+`blob-fs`；可切 `blob-cos`） | 低 |
@@ -103,7 +103,7 @@ features/<name>/
 1. 新建 `features/<name>`，`#[rpc("domain.action")]` 写 handler
 2. `RpcRouter::<AppState>::new().register(foo_rpc)?…`：**默认包进 `PrivateRpc`**（merge 时统一鉴权门）；仅匿名方法（如 login / refresh）进 `PublicRpc`（identity `create` 需登录但恒 `privileged=false`）
 3. `bin/api`：`.module(your_feature::module())`——**`persistence` / `cache` / `blob` 以及所有会 `register_ftl` / `register_domain_mapper` 的 feature 必须排在 `http_server` 之前**（`http_server` 在 `register` 时 `seal_bundles` + `seal_domain_mappers`；挂在其后会 panic 或域错误静默变成 `-32603`；`just layering` → `scripts/check_module_order.py` 会扫描并校验）；根上需 `init_group::<PublicRpc>()` + `init_group::<PrivateRpc>()`（探针另加 `init_group::<ProbeRouter>()`；HTTP 组另加 Public/Private Router）
-4. HTTP 非 RPC：探针走 `ProbeRouter`（见 `features/probe`）；公开 HTTP 走 `PublicRouter`（示范：`blob-fs` 下 `GET /files/*`（可选 `?w=` 派生）+ `is_public_readable_object_path` 守卫 + 不可信扩展 `Content-Disposition: attachment` + 本地预签名 PUT；默认 16 MiB body；Cos 不挂回源；staging GET 无 claim，靠高熵 path）；需登录走 `PrivateRouter`（当前模板无业务 HTTP；可按需扩展）
+4. HTTP 非 RPC：探针走 `ProbeRouter`（见 `features/probe`）；公开 HTTP 走 `PublicRouter`（示范：`blob-fs` 下 `GET /files/*`（可选 `?s=` 派生）+ `is_public_readable_object_path` 守卫 + 不可信扩展 `Content-Disposition: attachment` + 本地预签名 PUT；默认 16 MiB body；Cos 不挂回源；staging GET 无 claim，靠高熵 path）；需登录走 `PrivateRouter`（当前模板无业务 HTTP；可按需扩展）
 5. 需要 caller id 时再在 handler 参数加 `http_auth::AuthedAccount`（读 soft 中间件写入的 extensions）。**「要不要登录」由 `PrivateRpc` 分组决定**，勿依赖漏写提取器；勿在 `/jsonrpc` 上硬鉴权（公开方法共用该端点）
 6. 需要落库 / 跨 feature 共享类型：放 `features/<name>_contract`；其它 feature **只**依赖该 contract；在 `persistence` 里 `toasty::models!(…)` 注册
 7. 有领域错误时：在 feature 的 `module()` 里注册 locale bundle（ftl + domain mapper；示范：`register_identity_locale_bundle` / file 的 `register_file_*`）——**authn 例外**：由 `http_server::register` 调 `register_authn_locale()`，feature 不要重复注册。时机：业务 feature 均须在 `http_server` 之前
@@ -179,7 +179,7 @@ Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `Fr
 - Cookie session / Web 表单登录（当前为 Bearer JWT + opaque refresh；locale 的 `accept_language` Cookie 只做语言偏好）
 - 泛型化 `AppState` 里的 `TokenHelper`（当前固定 `TokenRealm::Account` 单 realm）——出现第二个 token realm 时再引入注册表 / 多实例，勿提前设计
 - 多 cache 后端、双组合根（独立 `bin/worker` 可后续再拆）
-- COS 数据万象 URL 分叉 / 独立图片服务（imgproxy 等）；当前 fs 同进程 `?w=` 派生
+- COS 数据万象 URL 分叉 / 独立图片服务（imgproxy 等）；当前 fs 同进程 `?s=` 派生
 - MFA / 多设备会话 / OIDC
 - 常见/breached 密码 denylist
 

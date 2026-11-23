@@ -26,7 +26,7 @@ api/blob-cos → blob/cos + file/blob-cos
 
 ## 威胁模型（公开可读）
 
-fs 下 `GET /files/{*path}`（及可选 `?w=`）对符合 dated 白名单的对象**匿名可读**，含 `staging/…`：无 claim ACL，安全依赖高熵 path（能力型 URL）。转正只是去掉 `staging/` 前缀——知 staging URL 即可推断正式 URL。
+fs 下 `GET /files/{*path}`（及可选 `?s=`）对符合 dated 白名单的对象**匿名可读**，含 `staging/…`：无 claim ACL，安全依赖高熵 path（能力型 URL）。转正只是去掉 `staging/` 前缀——知 staging URL 即可推断正式 URL。
 
 适合头像等「泄露 URL ≈ 可读」的场景。**私密附件勿默认走同一管道**；需要机密性时另做鉴权 GET（或短 TTL 签名读），勿把「世界可读 + 高熵」当成私有存储。
 

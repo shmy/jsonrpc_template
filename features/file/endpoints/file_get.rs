@@ -1,4 +1,4 @@
-//! `GET /files/{*path}`：静态回源；可选 `?w=` 走 [`crate::shared::image_derive`]。
+//! `GET /files/{*path}`：静态回源；可选 `?s=` 走 [`crate::shared::image_derive`]。
 
 use std::path::Path;
 
@@ -7,7 +7,7 @@ use axum::extract::{Extension, Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use blob_kit::Blob;
-use file_contract::{DERIVE_WIDTHS_HINT, DeriveRequest, resolve_derive_request};
+use file_contract::{DERIVE_SIZES_HINT, DeriveRequest, resolve_derive_request};
 use serde::Deserialize;
 use tower::ServiceExt;
 use tower_http::services::{ServeDir, ServeFile};
@@ -20,8 +20,8 @@ const DERIVE_RETRY_AFTER_SECS: &str = "1";
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct DeriveQuery {
-    /// 最长边像素；白名单见 [`file_contract::DERIVE_WIDTHS`]。
-    w: Option<u32>,
+    /// 最长边像素（size）；白名单见 [`file_contract::DERIVE_SIZES`]。
+    s: Option<u32>,
 }
 
 /// nest `/files` 后的 GET。
@@ -34,20 +34,20 @@ pub(crate) async fn handler(
     let root = fs.as_path();
     let object_path = request.uri().path().trim_start_matches('/');
 
-    let Some(width) = query.w else {
+    let Some(size) = query.s else {
         return serve_dir(root, request).await;
     };
 
-    let cache_path = match resolve_derive_request(object_path, width) {
+    let cache_path = match resolve_derive_request(object_path, size) {
         DeriveRequest::CachePath(path) => path,
-        DeriveRequest::BadWidth => {
+        DeriveRequest::BadSize => {
             return (
                 StatusCode::BAD_REQUEST,
-                format!("unsupported w; allow {DERIVE_WIDTHS_HINT}"),
+                format!("unsupported s; allow {DERIVE_SIZES_HINT}"),
             )
                 .into_response();
         }
-        // staging / 非图 / 已是派生缓存：忽略 w。
+        // staging / 非图 / 已是派生缓存：忽略 s。
         DeriveRequest::NotApplicable => return serve_dir(root, request).await,
     };
 
@@ -65,7 +65,7 @@ pub(crate) async fn handler(
     };
 
     materialize_response(
-        image_derive::materialize(&blob, object_path, &cache_path, width, permit).await,
+        image_derive::materialize(&blob, object_path, &cache_path, size, permit).await,
         root,
         &cache_path,
     )

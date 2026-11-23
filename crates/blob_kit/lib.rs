@@ -375,11 +375,11 @@ mod tests {
     async fn strip_public_url_scheme_alt_and_query() {
         let blob = Blob::new_for_test().await.expect("create test blob");
         assert_eq!(
-            blob.strip_public_url_prefix("https://test.local/files/staging/a.webp?w=256"),
+            blob.strip_public_url_prefix("https://test.local/files/staging/a.webp?s=256"),
             "staging/a.webp"
         );
         assert_eq!(
-            blob.strip_public_url_prefix("staging/a.webp?w=128"),
+            blob.strip_public_url_prefix("staging/a.webp?s=128"),
             "staging/a.webp"
         );
         // 真外链保留 query（签名 CDN）；勿在 keep_current 时剥掉。

@@ -55,7 +55,7 @@ fn is_blob_key(path: &str) -> bool {
     !is_external_url(path)
 }
 
-/// 列存 / in-use 归一：剥本站 domain（含 http↔https、去 `?w=`）；真外链或空 → `None`。
+/// 列存 / in-use 归一：剥本站 domain（含 http↔https、去 `?s=`）；真外链或空 → `None`。
 pub(crate) fn normalize_column_path(blob: &Blob, path: &str) -> Option<String> {
     let stripped = blob.strip_public_url_prefix(path.trim());
     let key = stripped.as_ref();
@@ -334,14 +334,14 @@ mod tests {
     #[tokio::test]
     async fn normalize_column_path_query_and_scheme_alt() {
         let blob = test_blob().await;
-        // 配置 domain 为 http；脏数据 https + ?w= 仍归一。
+        // 配置 domain 为 http；脏数据 https + ?s= 仍归一。
         assert_eq!(
-            normalize_column_path(&blob, "https://test.local/files/2026/01/a.webp?w=256")
+            normalize_column_path(&blob, "https://test.local/files/2026/01/a.webp?s=256")
                 .as_deref(),
             Some("2026/01/a.webp")
         );
         assert_eq!(
-            normalize_column_path(&blob, "2026/01/b.webp?w=512").as_deref(),
+            normalize_column_path(&blob, "2026/01/b.webp?s=512").as_deref(),
             Some("2026/01/b.webp")
         );
         // 外链（含 query）仍不进 in-use。
