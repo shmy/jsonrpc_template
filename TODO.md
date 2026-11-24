@@ -69,7 +69,7 @@
 
 - [ ] 覆盖 `SEED_ADMIN_PASSWORD`（默认 `admin123!`）；生产勿依赖 `.env.example` 的 `MASTER=true`
 - [ ] `create` 加 privileged / 邀请码 / 关闭公开注册；按需收紧 `read`/`search`
-- [ ] 评估 `Account` DB 模型与 wire DTO 分离（或审计全部 `skip_serializing`）
+- [x] `Account` / `AccountView` 分离（o2o；出站白名单；`fill_avatar` 在 identity extension trait）
 - [ ] blob-fs 多实例共享卷；或切 `blob-cos`
 - [ ] 第二组合根（`bin/ops`）前先收敛进程级 locale/mapper/in-use 全局，并把 token 签发下沉
 

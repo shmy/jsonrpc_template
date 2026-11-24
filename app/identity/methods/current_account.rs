@@ -2,7 +2,7 @@ use axum::extract::State;
 use axum_jsonrpc::rpc;
 use blob_kit::Blob;
 use http_auth::AuthedAccount;
-use identity_contract::Account;
+use identity_contract::{Account, AccountView};
 use rootcause::Result;
 use toasty::Db;
 
@@ -15,8 +15,7 @@ pub async fn current_account(
     AuthedAccount(caller): AuthedAccount,
     State(mut db): State<Db>,
     State(blob): State<Blob>,
-) -> Result<Account> {
-    let mut account = Account::require_by_id(&mut db, caller).await?;
-    avatar_ops::fill_avatar_for_wire(&blob, &mut account);
-    Ok(account)
+) -> Result<AccountView> {
+    let account = Account::require_by_id(&mut db, caller).await?;
+    Ok(avatar_ops::into_view(account, &blob))
 }

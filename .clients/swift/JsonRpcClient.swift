@@ -55,8 +55,8 @@ public enum JsonRpcClientError: Error, Sendable {
     case sessionExpired
 }
 
-public struct Account: Codable, Sendable {
-    /// 头像：库内为相对 object path 或外链；RPC 出站由 identity 拼成绝对 URL
+public struct AccountView: Codable, Sendable {
+    /// 头像：映射后仍是库内相对 path / 外链；绝对 URL 由 identity `fill_avatar` 填充
     public var avatar: String?
     /// 创建时间
     public var created_at: String
@@ -64,7 +64,7 @@ public struct Account: Codable, Sendable {
     public var id: String
     /// 姓名
     public var name: String
-    /// 手机号（库内明文；RPC 出站脱敏为 `138****8888`）
+    /// 手机号（已脱敏，例 `138****8888`）
     public var phone: String
     /// 备注
     public var remark: String?
@@ -227,11 +227,11 @@ public struct PresignResponse: Codable, Sendable {
 }
 
 public struct SearchAccountResponse: Codable, Sendable {
-    public var items: [Account]
+    public var items: [AccountView]
     /// 本页最后一条 id；无更多结果时为 null
     public var next_cursor: String?
 
-    public init(items: [Account], next_cursor: String?) {
+    public init(items: [AccountView], next_cursor: String?) {
         self.items = items
         self.next_cursor = next_cursor
     }
@@ -262,7 +262,7 @@ public final class JsonRpcClient: @unchecked Sendable {
     public var acceptLanguage: String?
     public var session: URLSession
 
-    public init(endpoint: URL = URL(string: "http://127.0.0.1:9000/jsonrpc")!, accessToken: String? = nil, refreshToken: String? = nil, acceptLanguage: String? = nil, session: URLSession = .shared) {
+    public init(endpoint: URL = URL(string: "http://127.0.0.1:19091/jsonrpc")!, accessToken: String? = nil, refreshToken: String? = nil, acceptLanguage: String? = nil, session: URLSession = .shared) {
         self.endpoint = endpoint
         self.accessToken = accessToken
         self.refreshToken = refreshToken
@@ -512,14 +512,14 @@ public final class JsonRpcClient: @unchecked Sendable {
 
     /// 创建账号（PrivateRpc；写入恒 `privileged=false`）
     /// RPC `identity.account.create` (Bearer required)
-    public func identityAccountCreate(_ params: IdentityAccountCreateParams) async throws -> Account {
-        return try await call(method: "identity.account.create", params: params, requiresAuth: true, as: Account.self)
+    public func identityAccountCreate(_ params: IdentityAccountCreateParams) async throws -> AccountView {
+        return try await call(method: "identity.account.create", params: params, requiresAuth: true, as: AccountView.self)
     }
 
     /// 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
     /// RPC `identity.account.current` (Bearer required)
-    public func identityAccountCurrent() async throws -> Account {
-        return try await call(method: "identity.account.current", params: Optional<EmptyParams>.none, requiresAuth: true, as: Account.self)
+    public func identityAccountCurrent() async throws -> AccountView {
+        return try await call(method: "identity.account.current", params: Optional<EmptyParams>.none, requiresAuth: true, as: AccountView.self)
     }
 
     /// 删除账号（本人或 privileged 删他人；特权账号禁删）
@@ -545,8 +545,8 @@ public final class JsonRpcClient: @unchecked Sendable {
 
     /// 读取账号（PrivateRpc；任意登录可读）
     /// RPC `identity.account.read` (Bearer required)
-    public func identityAccountRead(_ params: IdentityAccountReadParams) async throws -> Account {
-        return try await call(method: "identity.account.read", params: params, requiresAuth: true, as: Account.self)
+    public func identityAccountRead(_ params: IdentityAccountReadParams) async throws -> AccountView {
+        return try await call(method: "identity.account.read", params: params, requiresAuth: true, as: AccountView.self)
     }
 
     /// 刷新令牌并颁发新的访问令牌
@@ -563,8 +563,8 @@ public final class JsonRpcClient: @unchecked Sendable {
 
     /// 更新账号（本人或 privileged 改他人）
     /// RPC `identity.account.update` (Bearer required)
-    public func identityAccountUpdate(_ params: IdentityAccountUpdateParams) async throws -> Account {
-        return try await call(method: "identity.account.update", params: params, requiresAuth: true, as: Account.self)
+    public func identityAccountUpdate(_ params: IdentityAccountUpdateParams) async throws -> AccountView {
+        return try await call(method: "identity.account.update", params: params, requiresAuth: true, as: AccountView.self)
     }
 
 }

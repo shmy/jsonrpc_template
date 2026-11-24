@@ -2,7 +2,7 @@ use account_id::Id;
 use axum::extract::State;
 use axum_jsonrpc::{Params, rpc};
 use blob_kit::Blob;
-use identity_contract::Account;
+use identity_contract::{Account, AccountView};
 use rootcause::Result;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -23,8 +23,7 @@ pub async fn read_account(
     State(mut db): State<Db>,
     State(blob): State<Blob>,
     Params(request): Params<ReadAccountRequest>,
-) -> Result<Account> {
-    let mut account = Account::require_by_id(&mut db, request.id).await?;
-    avatar_ops::fill_avatar_for_wire(&blob, &mut account);
-    Ok(account)
+) -> Result<AccountView> {
+    let account = Account::require_by_id(&mut db, request.id).await?;
+    Ok(avatar_ops::into_view(account, &blob))
 }

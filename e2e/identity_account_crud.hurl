@@ -190,9 +190,12 @@ Accept-Language: en
   }
 }
 HTTP 200
+[Captures]
+carol_updated_at: jsonpath "$.result.updated_at"
 [Asserts]
 jsonpath "$.result.id" == "{{account_id}}"
 jsonpath "$.result.name" == "Carol"
+jsonpath "$.result.phone" == "138****0002"
 jsonpath "$.result.password" not exists
 jsonpath "$.result.privileged" not exists
 jsonpath "$.error" not exists
@@ -214,6 +217,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.result.id" == "{{victim_id}}"
 jsonpath "$.result.name" == "Dave"
+jsonpath "$.result.phone" == "138****0004"
 jsonpath "$.result.password" not exists
 jsonpath "$.error" not exists
 
@@ -234,6 +238,8 @@ HTTP 200
 [Asserts]
 jsonpath "$.result.items" count == 1
 jsonpath "$.result.items[0].id" == "{{account_id}}"
+jsonpath "$.result.items[0].phone" == "138****0002"
+jsonpath "$.result.items[0].password" not exists
 jsonpath "$.error" not exists
 
 # search other phone → 命中（与 read 一致）
@@ -253,6 +259,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.result.items" count == 1
 jsonpath "$.result.items[0].id" == "{{victim_id}}"
+jsonpath "$.result.items[0].phone" == "138****0004"
 jsonpath "$.error" not exists
 
 POST {{base_url}}/jsonrpc
@@ -274,7 +281,9 @@ HTTP 200
 [Asserts]
 jsonpath "$.result.id" == "{{account_id}}"
 jsonpath "$.result.name" == "Carol Updated"
+jsonpath "$.result.phone" == "138****0002"
 jsonpath "$.result.avatar" == "https://example.com/carol-v2.png"
+jsonpath "$.result.updated_at" != "{{carol_updated_at}}"
 jsonpath "$.result.password" not exists
 jsonpath "$.error" not exists
 

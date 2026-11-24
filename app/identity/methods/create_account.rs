@@ -4,7 +4,7 @@ use axum_jsonrpc::{ValidatedParams, rpc};
 use blob_kit::Blob;
 use cache_kit::Cache;
 use http_auth::AuthedAccount;
-use identity_contract::{Account, IdentityError, Password};
+use identity_contract::{Account, AccountView, IdentityError, Password};
 use rootcause::Result;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -53,12 +53,12 @@ pub async fn create_account(
     State(blob): State<Blob>,
     State(cache): State<Cache>,
     ValidatedParams(request): ValidatedParams<CreateAccountRequest>,
-) -> Result<Account> {
+) -> Result<AccountView> {
     let password = HashedPassword::try_new(request.password.as_str()).await?;
     let avatar =
         avatar_ops::resolve_avatar_for_write(&mut db, &blob, &cache, caller, request.avatar)
             .await?;
-    let Some(mut account) = Account::upsert_by_phone(&request.phone)
+    let Some(created) = Account::upsert_by_phone(&request.phone)
         .name(request.name)
         .password(password.into_string())
         .privileged(false)
@@ -74,6 +74,7 @@ pub async fn create_account(
         file_attachment::detach_fresh_best_effort(&mut db, avatar.fresh_path.as_deref()).await;
         return Err(IdentityError::AccountDuplicated.into());
     };
-    avatar_ops::fill_avatar_for_wire(&blob, &mut account);
-    Ok(account)
+    // 与 update 对称：reload 后再出站，避免 upsert 返回行与库内 #[auto] 时间戳不一致。
+    let account = Account::require_by_id(&mut db, created.id).await?;
+    Ok(avatar_ops::into_view(account, &blob))
 }

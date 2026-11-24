@@ -44,7 +44,11 @@ uuid = { workspace = true }
 [dev-dependencies]
 # token_ops 单测用内存后端；避免把 MemoryCache 编进生产二进制
 cache_kit = { workspace = true, features = ["memory"] }
+# into_view 填 URL 用内存 Blob
+blob_kit = { workspace = true, features = ["test-utils"] }
+jiff = { workspace = true }
 secrecy = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

@@ -2,7 +2,7 @@ use account_id::Id;
 use axum::extract::State;
 use axum_jsonrpc::{Params, rpc};
 use blob_kit::Blob;
-use identity_contract::Account;
+use identity_contract::{Account, AccountView};
 use rootcause::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,7 @@ pub struct SearchAccountRequest {
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct SearchAccountResponse {
-    pub items: Vec<Account>,
+    pub items: Vec<AccountView>,
     /// 本页最后一条 id；无更多结果时为 null
     pub next_cursor: Option<Id>,
 }
@@ -60,22 +60,23 @@ pub async fn search_account(
         predicates.push(Account::fields().id().lt(cursor));
     }
 
-    let mut items = Account::filter(Expr::and_all(predicates))
+    let mut rows = Account::filter(Expr::and_all(predicates))
         .order_by(Account::fields().id().desc())
         .limit(limit.saturating_add(1))
         .exec(&mut db)
         .await?;
 
-    let next_cursor = if items.len() > limit {
-        items.truncate(limit);
-        items.last().map(|account| account.id)
+    let next_cursor = if rows.len() > limit {
+        rows.truncate(limit);
+        rows.last().map(|account| account.id)
     } else {
         None
     };
 
-    for account in &mut items {
-        avatar_ops::fill_avatar_for_wire(&blob, account);
-    }
+    let items = rows
+        .into_iter()
+        .map(|account| avatar_ops::into_view(account, &blob))
+        .collect();
 
     Ok(SearchAccountResponse { items, next_cursor })
 }

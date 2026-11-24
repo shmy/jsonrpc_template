@@ -43,6 +43,8 @@ axum_jsonrpc = { version = "0.1.0", path = "crates/axum_jsonrpc" }
 axum_jsonrpc_macros = { version = "0.1.0", path = "crates/axum_jsonrpc_macros" }
 axum_jsonrpc_openrpc = { version = "0.1.0", path = "crates/axum_jsonrpc_openrpc" }
 schemars = { version = "1", default-features = false, features = ["derive"] }
+# syn2：与 edition 2024 / 新 syn 对齐；关 default(syn1) 避免双开
+o2o = { version = "0.5", default-features = false, features = ["syn2"] }
 axum = { version = "0.8", default-features = false, features = [
     "tokio",
     "http1",

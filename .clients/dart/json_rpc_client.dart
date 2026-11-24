@@ -6,8 +6,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-class Account {
-  /// 头像：库内为相对 object path 或外链；RPC 出站由 identity 拼成绝对 URL
+class AccountView {
+  /// 头像：映射后仍是库内相对 path / 外链；绝对 URL 由 identity `fill_avatar` 填充
   final String? avatar;
   /// 创建时间
   final String created_at;
@@ -15,14 +15,14 @@ class Account {
   final String id;
   /// 姓名
   final String name;
-  /// 手机号（库内明文；RPC 出站脱敏为 `138****8888`）
+  /// 手机号（已脱敏，例 `138****8888`）
   final String phone;
   /// 备注
   final String? remark;
   /// 更新时间
   final String updated_at;
 
-  Account({
+  AccountView({
     this.avatar,
     required this.created_at,
     required this.id,
@@ -32,7 +32,7 @@ class Account {
     required this.updated_at,
   });
 
-  factory Account.fromJson(Map<String, dynamic> json) => Account(
+  factory AccountView.fromJson(Map<String, dynamic> json) => AccountView(
         avatar: json['avatar'] as String?,
         created_at: json['created_at'] as String,
         id: json['id'] as String,
@@ -310,7 +310,7 @@ class PresignResponse {
 }
 
 class SearchAccountResponse {
-  final List<Account> items;
+  final List<AccountView> items;
   /// 本页最后一条 id；无更多结果时为 null
   final String? next_cursor;
 
@@ -320,7 +320,7 @@ class SearchAccountResponse {
   });
 
   factory SearchAccountResponse.fromJson(Map<String, dynamic> json) => SearchAccountResponse(
-        items: (json['items'] as List<dynamic>).map((e) => Account.fromJson(e as Map<String, dynamic>)).toList(),
+        items: (json['items'] as List<dynamic>).map((e) => AccountView.fromJson(e as Map<String, dynamic>)).toList(),
         next_cursor: json['next_cursor'] as String?,
       );
 
@@ -407,7 +407,7 @@ class JsonRpcSessionExpiredException implements Exception {
 
 class JsonRpcClient {
   JsonRpcClient({
-    this.endpoint = 'http://127.0.0.1:9000/jsonrpc',
+    this.endpoint = 'http://127.0.0.1:19091/jsonrpc',
     this.accessToken,
     this.refreshToken,
     this.acceptLanguage,
@@ -626,16 +626,16 @@ class JsonRpcClient {
 
   /// 创建账号（PrivateRpc；写入恒 `privileged=false`）
   /// RPC `identity.account.create` (Bearer required)
-  Future<Account> identityAccountCreate(IdentityAccountCreateParams params) async {
+  Future<AccountView> identityAccountCreate(IdentityAccountCreateParams params) async {
     final result = await _post(method: 'identity.account.create', params: params.toJson(), requiresAuth: true);
-    return Account.fromJson(result as Map<String, dynamic>);
+    return AccountView.fromJson(result as Map<String, dynamic>);
   }
 
   /// 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
   /// RPC `identity.account.current` (Bearer required)
-  Future<Account> identityAccountCurrent() async {
+  Future<AccountView> identityAccountCurrent() async {
     final result = await _post(method: 'identity.account.current', params: null, requiresAuth: true);
-    return Account.fromJson(result as Map<String, dynamic>);
+    return AccountView.fromJson(result as Map<String, dynamic>);
   }
 
   /// 删除账号（本人或 privileged 删他人；特权账号禁删）
@@ -665,9 +665,9 @@ class JsonRpcClient {
 
   /// 读取账号（PrivateRpc；任意登录可读）
   /// RPC `identity.account.read` (Bearer required)
-  Future<Account> identityAccountRead(IdentityAccountReadParams params) async {
+  Future<AccountView> identityAccountRead(IdentityAccountReadParams params) async {
     final result = await _post(method: 'identity.account.read', params: params.toJson(), requiresAuth: true);
-    return Account.fromJson(result as Map<String, dynamic>);
+    return AccountView.fromJson(result as Map<String, dynamic>);
   }
 
   /// 刷新令牌并颁发新的访问令牌
@@ -685,9 +685,9 @@ class JsonRpcClient {
 
   /// 更新账号（本人或 privileged 改他人）
   /// RPC `identity.account.update` (Bearer required)
-  Future<Account> identityAccountUpdate(IdentityAccountUpdateParams params) async {
+  Future<AccountView> identityAccountUpdate(IdentityAccountUpdateParams params) async {
     final result = await _post(method: 'identity.account.update', params: params.toJson(), requiresAuth: true);
-    return Account.fromJson(result as Map<String, dynamic>);
+    return AccountView.fromJson(result as Map<String, dynamic>);
   }
 
   void close() => _http.close(force: true);

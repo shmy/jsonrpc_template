@@ -42,8 +42,8 @@ sealed class JsonRpcClientException : RuntimeException() {
 }
 
 @Serializable
-data class Account(
-    /** 头像：库内为相对 object path 或外链；RPC 出站由 identity 拼成绝对 URL */
+data class AccountView(
+    /** 头像：映射后仍是库内相对 path / 外链；绝对 URL 由 identity `fill_avatar` 填充 */
     val avatar: String? = null,
     /** 创建时间 */
     val created_at: String,
@@ -51,7 +51,7 @@ data class Account(
     val id: String,
     /** 姓名 */
     val name: String,
-    /** 手机号（库内明文；RPC 出站脱敏为 `138****8888`） */
+    /** 手机号（已脱敏，例 `138****8888`） */
     val phone: String,
     /** 备注 */
     val remark: String? = null,
@@ -159,7 +159,7 @@ data class PresignResponse(
 
 @Serializable
 data class SearchAccountResponse(
-    val items: List<Account>,
+    val items: List<AccountView>,
     /** 本页最后一条 id；无更多结果时为 null */
     val next_cursor: String? = null
 )
@@ -177,7 +177,7 @@ data class TokenResponse(
 )
 
 class JsonRpcClient(
-    var endpoint: String = "http://127.0.0.1:9000/jsonrpc",
+    var endpoint: String = "http://127.0.0.1:19091/jsonrpc",
     @Volatile var accessToken: String? = null,
     @Volatile var refreshToken: String? = null,
     var acceptLanguage: String? = null,
@@ -414,7 +414,7 @@ class JsonRpcClient(
      * 创建账号（PrivateRpc；写入恒 `privileged=false`）
      * RPC `identity.account.create` (Bearer required)
      */
-    fun identityAccountCreate(params: IdentityAccountCreateParams): Account {
+    fun identityAccountCreate(params: IdentityAccountCreateParams): AccountView {
         return call(method = "identity.account.create", params = params, requiresAuth = true)
     }
 
@@ -422,9 +422,9 @@ class JsonRpcClient(
      * 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
      * RPC `identity.account.current` (Bearer required)
      */
-    fun identityAccountCurrent(): Account {
+    fun identityAccountCurrent(): AccountView {
         val result = post(method = "identity.account.current", params = null, requiresAuth = true) ?: throw JsonRpcClientException.MissingResult
-        return json.decodeFromJsonElement<Account>(result)
+        return json.decodeFromJsonElement<AccountView>(result)
     }
 
     /**
@@ -461,7 +461,7 @@ class JsonRpcClient(
      * 读取账号（PrivateRpc；任意登录可读）
      * RPC `identity.account.read` (Bearer required)
      */
-    fun identityAccountRead(params: IdentityAccountReadParams): Account {
+    fun identityAccountRead(params: IdentityAccountReadParams): AccountView {
         return call(method = "identity.account.read", params = params, requiresAuth = true)
     }
 
@@ -485,7 +485,7 @@ class JsonRpcClient(
      * 更新账号（本人或 privileged 改他人）
      * RPC `identity.account.update` (Bearer required)
      */
-    fun identityAccountUpdate(params: IdentityAccountUpdateParams): Account {
+    fun identityAccountUpdate(params: IdentityAccountUpdateParams): AccountView {
         return call(method = "identity.account.update", params = params, requiresAuth = true)
     }
 

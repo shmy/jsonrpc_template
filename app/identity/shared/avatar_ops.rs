@@ -3,7 +3,7 @@
 //! 通用时序（staging commit + attach 编排、fresh / stale 引用计数协议、
 //! 行写入失败补偿、删行失败回滚、in-use 安全网）都在 `infra/file_attachment`；
 //! 本模块只剩 identity 专属：
-//! - [`fill_avatar_for_wire`]：`Account.avatar` 出站拼绝对 URL
+//! - [`into_view`] / [`FillAvatar`]：Model → wire（脱敏后填头像绝对 URL）
 //! - update 的三态 wire 形态（省略 / 清空 / 替换）
 //! - 绑定策略：允许真外链、长度上限 2048
 //!
@@ -13,7 +13,7 @@ use account_id::Id;
 use blob_kit::Blob;
 use cache_kit::Cache;
 use file_attachment::{AttachmentWrite, BindInput, BindOptions, bind, keep_current};
-use identity_contract::Account;
+use identity_contract::{Account, AccountView};
 use rootcause::Result;
 use toasty::Db;
 
@@ -26,13 +26,26 @@ const AVATAR_BIND: BindOptions = BindOptions {
     allow_external: true,
 };
 
-/// 读出/响应：相对 key → 公网绝对 URL；已是 http(s) 则不动。
+/// 出站填充头像公网 URL（相对 key → 绝对；已是 http(s) 则不动）。
 ///
-/// 缩略图不落库、不单独出站字段：用 [`file_attachment::thumb_public_url`]
-///（仅 blob-fs：`…/id.ext?s=256`；cos 返回 `None`，客户端用原图）。
-#[inline]
-pub fn fill_avatar_for_wire(blob: &Blob, account: &mut Account) {
-    account.avatar = blob.fill_public_url_optional(account.avatar.take());
+/// 挂在 identity 而非 contract：避免 `AccountView` 依赖 `blob_kit`。
+pub trait FillAvatar {
+    fn fill_avatar(&mut self, blob: &Blob);
+}
+
+impl FillAvatar for AccountView {
+    #[inline]
+    fn fill_avatar(&mut self, blob: &Blob) {
+        self.avatar = blob.fill_public_url_optional(self.avatar.take());
+    }
+}
+
+/// `Account` → [`AccountView`]：o2o 映射（含 phone 脱敏）后填头像 URL。
+#[must_use]
+pub fn into_view(account: Account, blob: &Blob) -> AccountView {
+    let mut view = AccountView::from(account);
+    view.fill_avatar(blob);
+    view
 }
 
 /// create：`None`/空 = 无头像（old = None，无旧引用可扣）。
@@ -70,5 +83,58 @@ pub async fn replace_avatar(
             };
             bind(db, blob, cache, actor_id, old, input, AVATAR_BIND).await
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used, clippy::unwrap_used)]
+
+    use super::*;
+    use account_id::Id;
+    use jiff::Timestamp;
+
+    #[tokio::test]
+    async fn into_view_fills_relative_avatar_and_masks_phone() {
+        let blob = Blob::new_for_test().await.expect("test blob");
+        let account = Account {
+            id: Id::new_unchecked(7),
+            name: "Bob".into(),
+            phone: "13912345678".into(),
+            password: "hash".into(),
+            privileged: false,
+            avatar: Some("2026/01/x.jpg".into()),
+            remark: None,
+            version: 1,
+            created_at: Timestamp::from_second(1).unwrap(),
+            updated_at: Timestamp::from_second(2).unwrap(),
+        };
+        let view = into_view(account, &blob);
+        assert_eq!(view.phone, "139****5678");
+        let avatar = view.avatar.expect("avatar");
+        assert!(
+            avatar.starts_with("http") && avatar.ends_with("2026/01/x.jpg"),
+            "relative key should become absolute URL, got {avatar}"
+        );
+    }
+
+    #[tokio::test]
+    async fn into_view_keeps_external_avatar_url() {
+        let blob = Blob::new_for_test().await.expect("test blob");
+        let external = "https://cdn.example/a.png";
+        let account = Account {
+            id: Id::new_unchecked(8),
+            name: "Bob".into(),
+            phone: "13912345678".into(),
+            password: "hash".into(),
+            privileged: false,
+            avatar: Some(external.into()),
+            remark: None,
+            version: 1,
+            created_at: Timestamp::from_second(1).unwrap(),
+            updated_at: Timestamp::from_second(2).unwrap(),
+        };
+        let view = into_view(account, &blob);
+        assert_eq!(view.avatar.as_deref(), Some(external));
     }
 }

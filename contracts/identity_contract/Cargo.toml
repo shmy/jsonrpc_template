@@ -15,6 +15,7 @@ thiserror = { workspace = true }
 rootcause = { workspace = true }
 serde = { workspace = true }
 schemars = { workspace = true, features = ["jiff02"] }
+o2o = { workspace = true }
 validify = { workspace = true }
 
 [dev-dependencies]

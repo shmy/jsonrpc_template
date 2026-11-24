@@ -1,39 +1,31 @@
 use jiff::Timestamp;
 use rootcause::Result;
-use schemars::JsonSchema;
-use serde::Serialize;
 use toasty::{Executor, Model};
 
 use account_id::Id;
 
 use crate::IdentityError;
 
-#[derive(Debug, Serialize, Model, JsonSchema)]
+/// 账号落库模型（toasty）。出站请用 [`crate::AccountView`]。
+#[derive(Debug, Model)]
 pub struct Account {
     /// 账号ID
     #[key]
     pub id: Id,
     /// 姓名
     pub name: String,
-    /// 手机号（库内明文；RPC 出站脱敏为 `138****8888`）
+    /// 手机号（库内明文；wire 经 [`crate::AccountView`] 脱敏）
     #[unique]
-    #[serde(serialize_with = "crate::phone::serialize_masked_phone")]
     pub phone: String,
-    #[serde(skip_serializing)]
-    /// 密码
-    #[schemars(skip)]
+    /// 密码哈希
     pub password: String,
-    /// 特权账号（seed / 运维写入；API create 恒为 false；不序列化到 wire）
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
+    /// 特权账号（seed / 运维写入；API create 恒为 false）
     pub privileged: bool,
-    /// 头像：库内为相对 object path 或外链；RPC 出站由 identity 拼成绝对 URL
+    /// 头像：库内为相对 object path 或外链；出站绝对 URL 由 identity 填充
     pub avatar: Option<String>,
     /// 备注
     pub remark: Option<String>,
     /// 版本号
-    #[serde(skip_serializing)]
-    #[schemars(skip)]
     #[version]
     pub version: u64,
     /// 创建时间

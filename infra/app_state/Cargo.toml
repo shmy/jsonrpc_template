@@ -8,8 +8,8 @@ publish = false
 path = "lib.rs"
 
 [features]
-# 默认空：组合根经 `app`/`file` 的 blob-fs|blob-cos 显式打开。
-# 单独 `cargo check -p app_state` 时仍开 fs，方便叶子迭代。
+# 包默认 blob-fs（叶子单独 check）；workspace 依赖 default-features=false，
+# 由 app/file 的 blob-fs|blob-cos 显式打开，避免 cos 构建再拉进 fs。
 default = ["blob-fs"]
 blob-fs = ["blob_kit/fs"]
 blob-cos = ["blob_kit/cos"]

@@ -52,8 +52,8 @@ export class JsonRpcSessionExpiredError extends Error {
   }
 }
 
-export interface Account {
-  /** 头像：库内为相对 object path 或外链；RPC 出站由 identity 拼成绝对 URL */
+export interface AccountView {
+  /** 头像：映射后仍是库内相对 path / 外链；绝对 URL 由 identity `fill_avatar` 填充 */
   avatar: string | null;
   /** 创建时间 */
   created_at: string;
@@ -61,7 +61,7 @@ export interface Account {
   id: string;
   /** 姓名 */
   name: string;
-  /** 手机号（库内明文；RPC 出站脱敏为 `138****8888`） */
+  /** 手机号（已脱敏，例 `138****8888`） */
   phone: string;
   /** 备注 */
   remark: string | null;
@@ -158,7 +158,7 @@ export interface PresignResponse {
 }
 
 export interface SearchAccountResponse {
-  items: Account[];
+  items: AccountView[];
   /** 本页最后一条 id；无更多结果时为 null */
   next_cursor: string | null;
 }
@@ -190,7 +190,7 @@ export class JsonRpcClient {
   private readonly _fetch: typeof fetch;
 
   constructor(options: JsonRpcClientOptions = {}) {
-    this.endpoint = options.endpoint ?? "http://127.0.0.1:9000/jsonrpc";
+    this.endpoint = options.endpoint ?? "http://127.0.0.1:19091/jsonrpc";
     this.accessToken = options.accessToken ?? null;
     this.refreshToken = options.refreshToken ?? null;
     this.acceptLanguage = options.acceptLanguage ?? null;
@@ -413,16 +413,16 @@ export class JsonRpcClient {
    * 创建账号（PrivateRpc；写入恒 `privileged=false`）
    * RPC `identity.account.create` (Bearer required)
    */
-  async identityAccountCreate(params: IdentityAccountCreateParams): Promise<Account> {
-    return await this.call<Account>("identity.account.create", params, true);
+  async identityAccountCreate(params: IdentityAccountCreateParams): Promise<AccountView> {
+    return await this.call<AccountView>("identity.account.create", params, true);
   }
 
   /**
    * 获取当前登录账号（PrivateRpc；无参，id 来自 Bearer）
    * RPC `identity.account.current` (Bearer required)
    */
-  async identityAccountCurrent(): Promise<Account> {
-    return await this.call<Account>("identity.account.current", undefined, true);
+  async identityAccountCurrent(): Promise<AccountView> {
+    return await this.call<AccountView>("identity.account.current", undefined, true);
   }
 
   /**
@@ -459,8 +459,8 @@ export class JsonRpcClient {
    * 读取账号（PrivateRpc；任意登录可读）
    * RPC `identity.account.read` (Bearer required)
    */
-  async identityAccountRead(params: IdentityAccountReadParams): Promise<Account> {
-    return await this.call<Account>("identity.account.read", params, true);
+  async identityAccountRead(params: IdentityAccountReadParams): Promise<AccountView> {
+    return await this.call<AccountView>("identity.account.read", params, true);
   }
 
   /**
@@ -483,8 +483,8 @@ export class JsonRpcClient {
    * 更新账号（本人或 privileged 改他人）
    * RPC `identity.account.update` (Bearer required)
    */
-  async identityAccountUpdate(params: IdentityAccountUpdateParams): Promise<Account> {
-    return await this.call<Account>("identity.account.update", params, true);
+  async identityAccountUpdate(params: IdentityAccountUpdateParams): Promise<AccountView> {
+    return await this.call<AccountView>("identity.account.update", params, true);
   }
 
 }

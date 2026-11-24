@@ -4,7 +4,7 @@ use axum_jsonrpc::{ValidatedParams, rpc};
 use blob_kit::Blob;
 use cache_kit::Cache;
 use http_auth::AuthedAccount;
-use identity_contract::Account;
+use identity_contract::{Account, AccountView};
 use rootcause::Result;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -39,8 +39,9 @@ pub async fn update_account(
     State(blob): State<Blob>,
     State(cache): State<Cache>,
     ValidatedParams(request): ValidatedParams<UpdateAccountRequest>,
-) -> Result<Account> {
-    let mut account = load_for_mutate(&mut db, caller, request.id).await?;
+) -> Result<AccountView> {
+    let id = request.id;
+    let mut account = load_for_mutate(&mut db, caller, id).await?;
     let old_avatar = account.avatar.clone();
     let avatar = avatar_ops::replace_avatar(
         &mut db,
@@ -68,6 +69,7 @@ pub async fn update_account(
     // 行更新成功：此刻才扣减被替换 / 清除的旧对象引用。
     // 失败只 warn：漏减至多造成保守的引用残留（in-use 安全网兜底），不会误删。
     file_attachment::detach_stale(&mut db, avatar.stale_path.as_deref()).await;
-    avatar_ops::fill_avatar_for_wire(&blob, &mut account);
-    Ok(account)
+    // reload：toasty update 不回写内存行（含 #[auto] updated_at）。
+    let account = Account::require_by_id(&mut db, id).await?;
+    Ok(avatar_ops::into_view(account, &blob))
 }
