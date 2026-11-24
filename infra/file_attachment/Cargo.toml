@@ -15,8 +15,8 @@ workspace = true
 blob_kit = { workspace = true, features = ["fs"] }
 cache_kit = { workspace = true }
 file_contract = { workspace = true }
-# 模板特例：staging claim 主键借用 `identity_contract::Id`（与 http_auth 同类例外）
-identity_contract = { workspace = true }
+# staging claim 所有者主键用中立 account_id（勿再借 identity_contract）
+account_id = { workspace = true }
 rootcause = { workspace = true }
 toasty = { workspace = true }
 tracing = { workspace = true }

@@ -1,15 +1,19 @@
 //! identity FTL + domain mapper 一体注册（须在 `http_server` seal 之前）。
 
-use axum_jsonrpc::{ErrorObject, register_domain_mapper};
+use axum_jsonrpc::ErrorObject;
 use identity_contract::IdentityError;
-use locale::translate_current;
+use locale::{register_locale_bundle, translate_current};
 use rootcause::Report;
 
-/// 在 `module()` 内调用一次：同时 `register_ftl` + `register_domain_mapper`。
+/// 在 `module()` 内调用一次：FTL + domain mapper 成对注册。
 pub fn register_identity_locale_bundle() {
-    locale::register_ftl("en-US", include_str!("../locales/en-US/identity.ftl"));
-    locale::register_ftl("zh-CN", include_str!("../locales/zh-CN/identity.ftl"));
-    register_domain_mapper(map_identity_error);
+    register_locale_bundle(
+        &[
+            ("en-US", include_str!("../locales/en-US/identity.ftl")),
+            ("zh-CN", include_str!("../locales/zh-CN/identity.ftl")),
+        ],
+        map_identity_error,
+    );
 }
 
 fn map_identity_error(report: &Report) -> Option<ErrorObject> {

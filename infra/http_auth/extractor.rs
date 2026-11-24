@@ -1,12 +1,11 @@
+use crate::locale::{authn_rpc_code, authn_unauthorized_body};
+use account_id::Id;
 use authn_kit::AuthnError;
 use axum::Json;
 use axum::extract::FromRequestParts;
 use axum::http::{StatusCode, request::Parts};
 use axum::response::{IntoResponse, Response};
 use axum_jsonrpc::{ErrorObject, IntoExtractError};
-// 模板特例：仅借用 identity_contract::Id 作为账号主键类型（纯类型借用，不含业务逻辑）。
-use crate::locale::{authn_rpc_code, authn_unauthorized_body};
-use identity_contract::Id;
 use locale::translate_current;
 
 /// 已通过鉴权中间件写入 extensions 的当前账号。

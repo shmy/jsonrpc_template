@@ -22,6 +22,7 @@ http_extractors = { workspace = true }
 axum = { workspace = true }
 axum_jsonrpc = { workspace = true }
 schemars = { workspace = true }
+account_id = { workspace = true }
 identity_contract = { workspace = true }
 locale = { workspace = true }
 validify = { workspace = true }

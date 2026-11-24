@@ -3,6 +3,7 @@ members = [
     "bin/api",
     "bin/migrator",
     "bin/gen_mobile_clients",
+    "crates/account_id",
     "crates/authn_kit",
     "crates/axum_jsonrpc",
     "crates/axum_jsonrpc_macros",
@@ -133,6 +134,8 @@ toasty-cli = { version = "0.11", default-features = false }
 jiff = { version = "0.2", default-features = false, features = ["serde"] }
 persistence = { version = "0.1.0", path = "infra/persistence" }
 identity_contract = { version = "0.1.0", path = "features/identity_contract" }
+account_id = { version = "0.1.0", path = "crates/account_id" }
+itoa = { version = "1", default-features = false }
 tsid = { version = "0.3", default-features = false }
 argon2 = { version = "0.6", default-features = false, features = [
     "alloc",

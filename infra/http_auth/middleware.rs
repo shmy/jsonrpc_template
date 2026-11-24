@@ -8,8 +8,8 @@ use axum::response::{IntoResponse, Response};
 use crate::extractor::AuthedAccount;
 use crate::locale::authn_unauthorized_body;
 use crate::token::{access_token_from_headers, access_token_from_headers_optional};
+use account_id::Id;
 use app_state::AppState;
-use identity_contract::Id;
 
 /// 验证 Bearer access token 并解析出当前账号。
 ///

@@ -1,0 +1,21 @@
+[package]
+name = "account_id"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+itoa = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+toasty = { workspace = true }
+tsid = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

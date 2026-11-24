@@ -1,9 +1,10 @@
+use account_id::Id;
 use axum::extract::State;
 use axum_jsonrpc::{ValidatedParams, rpc};
 use blob_kit::Blob;
 use cache_kit::Cache;
 use http_auth::AuthedAccount;
-use identity_contract::{Account, Id, IdentityError, Password};
+use identity_contract::{Account, IdentityError, Password};
 use rootcause::Result;
 use schemars::JsonSchema;
 use serde::Deserialize;

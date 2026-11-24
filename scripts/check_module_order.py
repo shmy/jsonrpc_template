@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Assert bin/api module order: FTL/mapper features before http_server.
 
-Discovers features that call register_ftl / register_domain_mapper (by scanning
-features/*/ sources, ignoring // line comments), then checks each appears before
-http_server in bin/api/main.rs. http_server::register seals locale + domain mappers.
+Discovers features that call register_ftl / register_domain_mapper /
+register_locale_bundle (by scanning features/*/ sources, ignoring // line
+comments), then checks each appears before http_server in bin/api/main.rs.
+http_server::register seals locale + domain mappers.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ FEATURES = ROOT / "features"
 MODULE_RE = re.compile(
     r"\.module\(\s*(?P<name>[A-Za-z0-9_]+)\s*::\s*module\s*\(\s*\)\s*\)"
 )
-REGISTER_RE = re.compile(r"\bregister_(?:ftl|domain_mapper)\s*\(")
+REGISTER_RE = re.compile(r"\bregister_(?:ftl|domain_mapper|locale_bundle)\s*\(")
 
 
 def strip_line_comments(text: str) -> str:
@@ -57,7 +58,7 @@ def main() -> int:
     if not required:
         print(
             "module-order check FAILED: no feature calls register_ftl/"
-            "register_domain_mapper (scan broken?)",
+            "register_domain_mapper/register_locale_bundle (scan broken?)",
             file=sys.stderr,
         )
         return 1

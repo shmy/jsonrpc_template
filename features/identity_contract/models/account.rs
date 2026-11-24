@@ -4,7 +4,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use toasty::{Executor, Model};
 
-use crate::{Id, IdentityError};
+use account_id::Id;
+
+use crate::IdentityError;
 
 #[derive(Debug, Serialize, Model, JsonSchema)]
 pub struct Account {

@@ -14,8 +14,8 @@
 //! 在同一函数内天然成立）。**不要**在 feature `module()` 里再注册 authn FTL/mapper。
 
 use authn_kit::AuthnError;
-use axum_jsonrpc::{ErrorObject, register_domain_mapper};
-use locale::translate_current;
+use axum_jsonrpc::ErrorObject;
+use locale::{register_locale_bundle, translate_current};
 use rootcause::Report;
 use serde_json::{Value, json};
 
@@ -57,9 +57,13 @@ pub(crate) fn authn_unauthorized_body(err: &AuthnError) -> Value {
 
 /// 注册 authn FTL（en-US / zh-CN）与 domain mapper；`http_server` seal 前调用。
 pub fn register_authn_locale() {
-    locale::register_ftl("en-US", include_str!("locales/en-US/http_auth.ftl"));
-    locale::register_ftl("zh-CN", include_str!("locales/zh-CN/http_auth.ftl"));
-    register_domain_mapper(map_authn_error);
+    register_locale_bundle(
+        &[
+            ("en-US", include_str!("locales/en-US/http_auth.ftl")),
+            ("zh-CN", include_str!("locales/zh-CN/http_auth.ftl")),
+        ],
+        map_authn_error,
+    );
 }
 
 fn map_authn_error(report: &Report) -> Option<ErrorObject> {

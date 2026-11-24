@@ -9,10 +9,11 @@
 //!
 //! 引用计数时序详见 `file_attachment::bind` 的模块文档。
 
+use account_id::Id;
 use blob_kit::Blob;
 use cache_kit::Cache;
 use file_attachment::{AttachmentWrite, BindInput, BindOptions, bind, keep_current};
-use identity_contract::{Account, Id};
+use identity_contract::Account;
 use rootcause::Result;
 use toasty::Db;
 

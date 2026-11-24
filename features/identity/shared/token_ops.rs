@@ -1,11 +1,12 @@
 use std::time::Duration;
 
+use account_id::Id;
 use authn_kit::{
     AuthnError, access_jti_key, refresh_digest, refresh_grace_key, refresh_key,
     refresh_key_from_digest, subject_refresh_key, used_refresh_key,
 };
 use cache_kit::Cache;
-use identity_contract::{Id, IdentityError};
+use identity_contract::IdentityError;
 use jwt_kit::TokenHelper;
 use rootcause::{Report, Result};
 use serde::{Deserialize, Serialize};

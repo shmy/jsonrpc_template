@@ -42,10 +42,41 @@ fn registry_lock() -> MutexGuard<'static, Option<Vec<FtlEntry>>> {
 
 /// Register a Fluent resource. Call from feature `module()` before [`seal_bundles`].
 ///
+/// Prefer [`register_locale_bundle`] so FTL + domain mapper stay paired.
+///
 /// # Panics
 /// If called after bundles have already been sealed.
 pub fn register_ftl(locale: &'static str, ftl: &'static str) {
     let mut guard = registry_lock();
+    push_ftl_locked(&mut guard, locale, ftl);
+}
+
+/// Register all FTL fragments **and** the domain mapper in one call.
+///
+/// FTLs share a single registry lock; then the domain mapper is registered.
+/// Use from feature `module()` before `http_server` seals. Avoids registering
+/// only half of the pair (missing mapper → domain errors become `-32603`).
+///
+/// # Panics
+/// If called after locale bundles or domain mappers have already been sealed.
+pub fn register_locale_bundle(
+    ftls: &[(&'static str, &'static str)],
+    mapper: axum_jsonrpc::DomainReportMapper,
+) {
+    {
+        let mut guard = registry_lock();
+        for &(locale, ftl) in ftls {
+            push_ftl_locked(&mut guard, locale, ftl);
+        }
+    }
+    axum_jsonrpc::register_domain_mapper(mapper);
+}
+
+fn push_ftl_locked(
+    guard: &mut MutexGuard<'static, Option<Vec<FtlEntry>>>,
+    locale: &'static str,
+    ftl: &'static str,
+) {
     #[allow(clippy::expect_used)]
     let registry = guard.as_mut().expect(
         "register_ftl after bundles sealed \

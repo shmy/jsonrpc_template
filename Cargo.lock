@@ -3,6 +3,18 @@
 version = 4
 
 [[package]]
+name = "account_id"
+version = "0.1.0"
+dependencies = [
+ "itoa",
+ "schemars",
+ "serde",
+ "serde_json",
+ "toasty",
+ "tsid",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1369,10 +1381,10 @@ dependencies = [
 name = "file_attachment"
 version = "0.1.0"
 dependencies = [
+ "account_id",
  "blob_kit",
  "cache_kit",
  "file_contract",
- "identity_contract",
  "rootcause",
  "toasty",
  "tokio",
@@ -1855,11 +1867,11 @@ checksum = "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
 name = "http_auth"
 version = "0.1.0"
 dependencies = [
+ "account_id",
  "app_state",
  "authn_kit",
  "axum",
  "axum_jsonrpc",
- "identity_contract",
  "locale",
  "rootcause",
  "serde_json",
@@ -2187,6 +2199,7 @@ dependencies = [
 name = "identity"
 version = "0.1.0"
 dependencies = [
+ "account_id",
  "app_state",
  "argon2",
  "authn_kit",
@@ -2218,6 +2231,7 @@ dependencies = [
 name = "identity_contract"
 version = "0.1.0"
 dependencies = [
+ "account_id",
  "jiff 0.2.46",
  "rootcause",
  "schemars",
@@ -2225,7 +2239,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "toasty",
- "tsid",
  "validify",
 ]
 
@@ -2719,6 +2732,7 @@ name = "locale"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "axum_jsonrpc",
  "fluent-bundle",
  "tokio",
  "tower",

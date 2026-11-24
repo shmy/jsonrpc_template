@@ -1,7 +1,8 @@
 //! 管理员 seed（仅 `MASTER=true`）：按配置手机号 upsert 一个特权账号。
 
+use account_id::Id;
 use config::cli::{Cli, ExposeSecret};
-use identity_contract::{Account, Id};
+use identity_contract::Account;
 use modrun::{Error, Lifecycle, hook};
 use toasty::Db;
 

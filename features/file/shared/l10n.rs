@@ -1,13 +1,17 @@
-use axum_jsonrpc::{ErrorObject, register_domain_mapper};
+use axum_jsonrpc::ErrorObject;
 use file_contract::FileError;
-use locale::{register_ftl, translate_current};
+use locale::{register_locale_bundle, translate_current};
 use rootcause::Report;
 
-/// 在 `module()` 内调用一次：同时 `register_ftl` + `register_domain_mapper`。
+/// 在 `module()` 内调用一次：FTL + domain mapper 成对注册。
 pub fn register_file_locale_bundle() {
-    register_ftl("en-US", include_str!("../locales/en-US/file.ftl"));
-    register_ftl("zh-CN", include_str!("../locales/zh-CN/file.ftl"));
-    register_domain_mapper(map_file_error);
+    register_locale_bundle(
+        &[
+            ("en-US", include_str!("../locales/en-US/file.ftl")),
+            ("zh-CN", include_str!("../locales/zh-CN/file.ftl")),
+        ],
+        map_file_error,
+    );
 }
 
 fn map_file_error(report: &Report) -> Option<ErrorObject> {

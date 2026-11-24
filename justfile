@@ -37,6 +37,10 @@ check:
 check-fast crate="identity":
     cargo check -p {{crate}}
 
+# 从 docs/feature-template 复制叶子 feature 骨架（不改 workspace / bin/api）
+new-feature name:
+    python3 scripts/new_feature.py {{name}}
+
 layering:
     python3 scripts/check_layering.py
     python3 scripts/check_module_order.py

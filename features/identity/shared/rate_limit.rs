@@ -1,10 +1,11 @@
 //! Method 内 Redis 限流（login/refresh IP、login 手机号、change_password subject）。
 //! 配额均为进程级配置（`app_state` / `RATE_LIMIT_AUTH_*` 等），非硬编码。
 
+use account_id::Id;
 use app_state::{AuthRateLimit, LoginPhoneRate};
 use cache_kit::Cache;
 use http_extractors::ClientIp;
-use identity_contract::{Id, IdentityError};
+use identity_contract::IdentityError;
 use rootcause::Result;
 
 use crate::shared::token_ops::map_cache_err;

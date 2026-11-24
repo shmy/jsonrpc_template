@@ -11,10 +11,10 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
+use account_id::Id;
 use blob_kit::{Blob, BlobError, is_staging_object_path, resolve_staging_move_paths};
 use cache_kit::Cache;
 use file_contract::{DEFAULT_DERIVE_SIZE, FileError, derived_cache_paths, thumb_object_path};
-use identity_contract::Id;
 use rootcause::Result;
 use toasty::sql::query;
 use toasty::sql::statement;

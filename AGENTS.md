@@ -2,7 +2,7 @@
 
 给在本仓库工作的编码代理：优先遵循本文，细节以代码与 `README.md` / `TODO.md` 为准。
 
-**快速入口：** 启动/端点 → [`README.md`](README.md)；加业务 → [`docs/feature-template/`](docs/feature-template/)；blob 后端切换 → [`docs/blob-backends.md`](docs/blob-backends.md)；分层 CI → `just layering`。
+**快速入口：** 启动/端点 → [`README.md`](README.md)；加业务 → [`docs/feature-template/`](docs/feature-template/)（`just new-feature <name>`）；blob 后端切换 → [`docs/blob-backends.md`](docs/blob-backends.md)；分层 CI → `just layering`。
 
 ## 项目是什么
 
@@ -21,7 +21,7 @@ bin/api                    # 组合根：CLI supply + module 注册
   → features/*_contract    # 跨 feature 契约（模型等）；feature 唯一可依赖的兄弟层
   → infra/*                # 应用壳（http_server、persistence、blob、file_attachment、…）
   → crates/axum_jsonrpc*   # 协议核（不要反向依赖 features / 模板 infra）
-  → crates/{blob_kit,trace_kit,…}
+  → crates/{account_id,blob_kit,trace_kit,…}
 ```
 
 | 目录 | 职责 | 改动频率 |
@@ -38,6 +38,7 @@ bin/api                    # 组合根：CLI supply + module 注册
 | `infra/http_extractors` | `ClientIp` + `TRUSTED_PROXIES` 解析 | 低 |
 | `infra/persistence` | DB 连接；提供进程级 `Db`；注册 `*_contract` 模型；仅 `MASTER=true` 时 apply embedded migrations（默认 `false`） | 中 |
 | `infra/http_server` | `Db`+`Cache`+`Blob`+JWT → `AppState`；合并路由、监听、OpenRPC info、中间件、`with_state` | 中 |
+| `crates/account_id` | 账号主键 `Id`（线格式 string / 内存 u64）；壳层与业务直接依赖，contract 不 re-export | 低 |
 | `crates/{authn_kit,jwt_kit,cache_kit}` | 鉴权 key/错误、HS256 JWT、Redis 缓存门面 | 低 |
 | `features/file` | `file.presign`、（fs）本地预签名 PUT / 回源 / `?s=`（`shared/image_derive` + `endpoints/file_get`）、Lifecycle GC（仅 master） | 中 |
 | `features/*` | 业务 RPC / HTTP | **高（日常应落这里）** |
@@ -51,11 +52,11 @@ bin/api                    # 组合根：CLI supply + module 注册
 - feature 依赖 `http_server`（用 `app_state` / `http_routing` / `axum_jsonrpc` / `locale`）
 - **feature 依赖另一个 feature 实现 crate**——兄弟业务只能依赖对方的 `*_contract`（例：可用 `identity_contract`，禁止依赖 `identity`）。附件实现走 `infra/file_attachment`（通用绑定编排 `file_attachment::bind` + fresh/stale 时序；identity `avatar_ops` 为薄适配示范，新业务勿复制粘贴它的实现）
 - `*_contract` 依赖任何 feature 实现，或互相堆业务逻辑（契约保持薄：**只放 wire 形态（新类型/schema/稳定错误码）**，含业务语义的规则落 feature 实现）。staging 前缀权威在 `blob_kit::STAGING_PREFIX`；`file_contract::STORAGE_DIR_PREFIX` 为镜像，由 `file` 单测锁死相等
-- infra 依赖 `features/*_contract`——**仅允许下列例外**（勿再扩大）：
+- infra 依赖 `features/*_contract`——**仅允许下列例外**（冻结；新增须改 `scripts/check_layering.py` + 本表并写明理由）：
   1. `persistence`：`toasty::models!(…)` **注册**各 `*_contract` 模型（落库壳，不写业务）
-  2. `http_auth`：借用 `identity_contract::Id` 作为 `AuthedAccount` 主键（纯类型；出现第二个带自有主键的业务时再泛型化）
-  3. `file_attachment`：staging claim 主键借用 `identity_contract::Id`（与上同类）；域错误借用 `file_contract::FileError` / 码段（附件实现与 file 契约对齐，勿让 feature 互依）
-- `crates/` 里的工具 kit（`authn_kit` / `jwt_kit` / `cache_kit` / `blob_kit` / `image_kit` / `trace_kit`）保持协议与业务无关：不定义 `-320xx` RPC 码段、不依赖 `locale`——码段分配与文案归使用它的 infra / feature 壳层（例：authn 在 `http_auth`；file 在 `file_contract`）。`blob_kit`：Fs 本地 HMAC 在 `local_presign` / `Fs`；门面只提供 `as_fs()`，勿再挂 `verify_local_*`
+  2. `file_attachment`：域错误 / 路径约定借用 `file_contract`（附件实现与 file 契约对齐，勿让 feature 互依）
+- 账号主键在 `crates/account_id`（`Id`）；`identity_contract` **不** re-export。`http_auth` / `file_attachment` / identity 模型与方法 **直接依赖 `account_id`**。出现**第二个自有主键主体**时再考虑泛型 `AuthedAccount` / subject 注册表——现在不做。
+- `crates/` 里的工具 kit（`account_id` / `authn_kit` / `jwt_kit` / `cache_kit` / `blob_kit` / `image_kit` / `trace_kit`）保持协议与业务无关：不定义 `-320xx` RPC 码段、不依赖 `locale`——码段分配与文案归使用它的 infra / feature 壳层（例：authn 在 `http_auth`；file 在 `file_contract`）。`blob_kit`：Fs 本地 HMAC 在 `local_presign` / `Fs`；门面只提供 `as_fs()`，勿再挂 `verify_local_*`
 
 ## AppState 所有权（易错）
 
@@ -76,7 +77,27 @@ Schema 变更：改 `*_contract` 模型 → `just migration-generate` → 提交
 
 ## 扩展业务 Feature
 
-抄写骨架：[`docs/feature-template/`](docs/feature-template/)（**非** workspace 成员；默认依赖勿照抄 `identity`）。
+**接线清单（权威、一屏）：** [`docs/feature-template/README.md`](docs/feature-template/README.md)。  
+脚手架：`just new-feature <name>`（复制模板并打印下一步）。默认依赖勿照抄 `identity`。
+
+### 决策树（何时加什么）
+
+```text
+需要落库 / 跨 feature 共享类型？
+  → features/<name>_contract + persistence models!（仅 contract，勿依赖兄弟 feature 实现）
+需要当前登录账号？
+  → http_auth::AuthedAccount；登录门槛靠进 PrivateRpc（勿对 /jsonrpc 硬鉴权）
+匿名 RPC（login/refresh）？
+  → PublicRpc；其余默认 PrivateRpc
+领域错误？
+  → locale::register_locale_bundle（FTL+mapper 成对；module 在 http_server 前）
+持有正式 blob 引用？
+  → file_attachment::bind + register_attachment_in_use（排在 file 前）
+非 RPC HTTP？
+  → ProbeRouter / PublicRouter / PrivateRouter（见 probe、file）
+跨 feature 复用实现（非模型）？
+  → 抽 infra/* 或下沉 contract；禁止 use 兄弟 feature
+```
 
 ### 目录约定
 
@@ -92,30 +113,12 @@ features/<name>/
   locales/{en-US,zh-CN}/*.ftl
 ```
 
-- **根目录只留** `lib.rs` + 可选的 `methods/` / `endpoints/` / `shared/` / `locales/`；禁止再在根上堆 `l10n.rs`、`token_ops.rs`、`http_error.rs` 等
-- **子模块声明统一** `foo/mod.rs`，不用并列的 `foo.rs` + `foo/`；`methods` / `endpoints` / `shared` 下的子模块一律 `pub(crate) mod`（`lib` 里对三者本身用私有 `mod`）
-- **`shared/` 始终存在**（只要有 locale / 跨 method 逻辑）；`l10n` 固定为 `shared/l10n.rs`
-- **无 HTTP 的 feature 不建** `endpoints/`；无 RPC 的（如 probe）不建 `methods/`
-- method 文件名用 RPC 动作短名（`login_account`、`presign`）；endpoint 文件名用路由语义（`livez`、`file_presigned_put`），不必强加 feature 前缀
+- **根目录只留** `lib.rs` + 可选的 `methods/` / `endpoints/` / `shared/` / `locales/`
+- **子模块声明统一** `foo/mod.rs`；`methods` / `endpoints` / `shared` 下子模块 `pub(crate) mod`
+- **`shared/l10n.rs`** 固定；无 HTTP 不建 `endpoints/`；无 RPC 不建 `methods/`
+- 方法名点分域：`identity.account.create`；Handler 可用 `Params` / `State` / `FromRequestParts`
 
-### 步骤
-
-1. 新建 `features/<name>`，`#[rpc("domain.action")]` 写 handler
-2. `RpcRouter::<AppState>::new().register(foo_rpc)?…`：**默认包进 `PrivateRpc`**（merge 时统一鉴权门）；仅匿名方法（如 login / refresh）进 `PublicRpc`（identity `create` 需登录但恒 `privileged=false`）
-3. `bin/api`：`.module(your_feature::module())`——**`persistence` / `cache` / `blob` 以及所有会 `register_ftl` / `register_domain_mapper` 的 feature 必须排在 `http_server` 之前**（`http_server` 在 `register` 时 `seal_bundles` + `seal_domain_mappers`；挂在其后会 panic 或域错误静默变成 `-32603`；`just layering` → `scripts/check_module_order.py` 会扫描并校验）；根上需 `init_group::<PublicRpc>()` + `init_group::<PrivateRpc>()`（探针另加 `init_group::<ProbeRouter>()`；HTTP 组另加 Public/Private Router）
-4. HTTP 非 RPC：探针走 `ProbeRouter`（见 `features/probe`）；公开 HTTP 走 `PublicRouter`（示范：`blob-fs` 下 `GET /files/*`（可选 `?s=` 派生）+ `is_public_readable_object_path` 守卫 + 不可信扩展 `Content-Disposition: attachment` + 本地预签名 PUT；默认 16 MiB body；Cos 不挂回源；staging GET 无 claim，靠高熵 path）；需登录走 `PrivateRouter`（当前模板无业务 HTTP；可按需扩展）
-5. 需要 caller id 时再在 handler 参数加 `http_auth::AuthedAccount`（读 soft 中间件写入的 extensions）。**「要不要登录」由 `PrivateRpc` 分组决定**，勿依赖漏写提取器；勿在 `/jsonrpc` 上硬鉴权（公开方法共用该端点）
-6. 需要落库 / 跨 feature 共享类型：放 `features/<name>_contract`；其它 feature **只**依赖该 contract；在 `persistence` 里 `toasty::models!(…)` 注册
-7. 有领域错误时：在 feature 的 `module()` 里注册 locale bundle（ftl + domain mapper；示范：`register_identity_locale_bundle` / file 的 `register_file_*`）——**authn 例外**：由 `http_server::register` 调 `register_authn_locale()`，feature 不要重复注册。时机：业务 feature 均须在 `http_server` 之前
-8. 持有正式 blob 对象引用的 feature（如 identity avatar）须在 `module()` 调用 `file_attachment::register_attachment_in_use`，供 AttachmentGc 安全网合并；该 module 应排在启动 GC 的 `file` 之前（或至少在进程 `run` 前完成注册）。绑定编排直接用 `file_attachment::bind`（入参 `BindInput::Clear/Set` 显式区分清空；省略态走 `keep_current`；fresh/stale 时序见其模块文档），勿在各 feature 里手写 commit/attach/detach 编排
-
-**默认 Cargo 依赖（叶子 feature）**：`app_state` + `http_routing` + `axum_jsonrpc` + `locale` + 自己的 `*_contract`。按需再加：`http_auth`（只要 `AuthedAccount`）、`http_extractors`（`ClientIp` 等）。**不要**默认照抄 `identity` 整图（它还拉了 `config` / `authn_kit` / `jwt_kit` / `cache_kit`，因为示范会话面）。
-
-跨 feature 复用**实现逻辑**（非模型）：不能依赖兄弟 feature 实现 crate；当第二个 feature 需要同一实现（例：identity 内部 `shared/hashed_password` 的密码哈希），把它提取到 `infra/*` 小 crate 或下沉 contract，禁止直接 `use identity::…`（`shared` 本就 crate-private，也够不到）。
-
-方法命名示范：`identity.account.create`（点分域）。
-
-Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `FromRequestParts`。
+**默认 Cargo 依赖**：`app_state` + `http_routing` + `axum_jsonrpc` + `locale` + 自己的 `*_contract`。按需：`http_auth`、`http_extractors`。
 
 ## 错误与 locale
 
@@ -135,7 +138,7 @@ Handler 可用 Axum 同构提取器：`Params<T>`、`State<…>`、自定义 `Fr
 - **跨 feature 共享**的领域错误放在 `*_contract`：`#[error("snake_case_key")]` + `rpc_code()`；基础设施失败不要包进该枚举
 - 套路：
   - Handler / helper：`rootcause::Result`；外库直接 `?`
-  - 领域失败：`Err(MyError::….into())`（feature 在 `module()` 注册 `register_domain_mapper` + `locale::register_ftl`，且该 module 须在 `http_server` 之前）
+  - 领域失败：`Err(MyError::….into())`（feature 在 `module()` 用 `locale::register_locale_bundle` 成对注册 FTL+mapper，且该 module 须在 `http_server` 之前）
   - FTL：`features/<name>/locales/{en-US,zh-CN}/*.ftl`；`Display` / `l10n_key` 即 Fluent key
   - 临时非域错误可直接 `Result<T, ErrorObject>` / `Err(ErrorObject::new(...))`
   - `http_server` 启动前：`register_authn_locale()` → `seal_bundles` + `seal_domain_mappers`；漏注册 mapper 会把域错误打成 `-32603`；seal 后再 `register_*` 会 panic
@@ -211,7 +214,7 @@ just dev                      # cargo watch -x "run -p api"
 
 - [ ] 依赖方向未破坏（`just layering`；核 ← 模板 ← feature；feature 之间只经 `*_contract`）
 - [ ] 新 RPC：默认进 `PrivateRpc`；仅匿名方法进 `PublicRpc`；`bin/api` 已 `init_group` 且 module 排在 `http_server` 之前
-- [ ] 业务错误有稳定 `-320xx`（避开协议 `-32007`/`-32010` 与 authn `-32020..`）：`module()` 内同时 `register_domain_mapper` + `register_ftl`（漏注册会变 `-32603`；挂在 `http_server` 之后会 seal 后注册 panic）；authn 勿在 feature 重复注册
+- [ ] 业务错误有稳定 `-320xx`（避开协议 `-32007`/`-32010` 与 authn `-32020..`）：`module()` 内 `locale::register_locale_bundle`（漏 mapper 会变 `-32603`；挂在 `http_server` 之后会 seal 后注册 panic）；authn 勿在 feature 重复注册
 - [ ] `/jsonrpc` 响应带 `x-request-id`；未滥用 `error.data` 传业务字段 / 未再往 body 塞 `trace_id`
 - [ ] AppState：`persistence` 提供 `Db`，`cache` 提供 Redis，`blob` 提供 `Blob`，`http_server` 包成 `AppState` 后 `with_state`；feature 只用 `RpcRouter::<AppState>::new()`
 - [ ] 需 caller id 时用 `AuthedAccount`；登录门槛靠 `PrivateRpc`（勿对 `/jsonrpc` 强制 Bearer）；默认依赖勿照抄 identity 整图

@@ -1,5 +1,9 @@
-//! 线格式 string、内存 u64 的账号 ID（避免 JS 大整数精度问题）。
+//! 账号主键：线格式 string、内存 u64（避免 JS 大整数精度问题）。
+//!
+//! 壳层（`http_auth` / `file_attachment`）与业务（`identity` / `identity_contract` 模型）
+//! 直接依赖本 crate；`identity_contract` **不** re-export。
 
+use itoa::Buffer;
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -57,7 +61,8 @@ impl fmt::Display for Id {
 
 impl Serialize for Id {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.0.to_string())
+        let mut buf = Buffer::new();
+        serializer.serialize_str(buf.format(self.0))
     }
 }
 
@@ -78,7 +83,7 @@ impl JsonSchema for Id {
     }
 
     fn schema_id() -> Cow<'static, str> {
-        "identity_contract::Id".into()
+        "account_id::Id".into()
     }
 
     fn json_schema(_: &mut SchemaGenerator) -> Schema {
@@ -95,6 +100,7 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::Id;
+    use schemars::JsonSchema;
     use serde_json::{from_value, json, to_value};
 
     #[test]
@@ -110,5 +116,12 @@ mod tests {
     fn rejects_number_and_garbage() {
         assert!(from_value::<Id>(json!(123)).is_err());
         assert!(from_value::<Id>(json!("abc")).is_err());
+    }
+
+    #[test]
+    fn schema_id_and_inline_locked() {
+        assert!(Id::inline_schema());
+        assert_eq!(Id::schema_id(), "account_id::Id");
+        assert_eq!(Id::schema_name(), "Id");
     }
 }

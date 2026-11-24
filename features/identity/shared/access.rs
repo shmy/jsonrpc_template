@@ -5,7 +5,8 @@
 //!
 //! 新 RPC 若按 id 改删资源，应复用本模块；勿只依赖漏写 `AuthedAccount`。
 
-use identity_contract::{Account, Id, IdentityError};
+use account_id::Id;
+use identity_contract::{Account, IdentityError};
 use rootcause::Result;
 use toasty::Executor;
 

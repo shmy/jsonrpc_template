@@ -8,12 +8,12 @@ publish = false
 path = "lib.rs"
 
 [dependencies]
+account_id = { workspace = true }
 toasty = { workspace = true }
 jiff = { workspace = true }
 thiserror = { workspace = true }
 rootcause = { workspace = true }
 serde = { workspace = true }
-tsid = { workspace = true }
 schemars = { workspace = true, features = ["jiff02"] }
 validify = { workspace = true }
 

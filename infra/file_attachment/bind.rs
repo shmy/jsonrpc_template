@@ -35,10 +35,10 @@
 //! 2. 列存相对 key；入站让 [`bind`] 归一（本站 URL 自动剥 domain），出站拼 URL；
 //! 3. handler 严格按上面 fresh / stale 时序调用（勿自行编排 commit + detach）。
 
+use account_id::Id;
 use blob_kit::{Blob, is_staging_object_path};
 use cache_kit::Cache;
 use file_contract::FileError;
-use identity_contract::Id;
 use rootcause::Result;
 use toasty::Db;
 

@@ -8,10 +8,11 @@ Forbidden:
   - crates/* → features/* | infra/* (except none)
   - infra/* → features/* (implementation); contract only via allowlist
 
-Allowed infra → *_contract:
-  - persistence → identity_contract, file_contract
-  - http_auth → identity_contract
-  - file_attachment → identity_contract, file_contract
+Allowed infra → *_contract (frozen; new entries need script + AGENTS + rationale):
+  - persistence → identity_contract, file_contract  (toasty models! only)
+  - file_attachment → file_contract  (attachment errors/paths align with file)
+  - NOT allowed: http_auth / file_attachment → identity_contract
+    (account primary key lives in crates/account_id)
 """
 
 from __future__ import annotations
@@ -84,10 +85,13 @@ def deps_of(cargo_toml: Path) -> set[str]:
     return names
 
 
+# Frozen allowlist. Adding a row requires: update this map, AGENTS.md layering
+# exceptions table, and a one-line rationale comment here.
 INFRA_CONTRACT_ALLOW: dict[str, set[str]] = {
+    # persistence: register toasty models only (no business logic)
     "persistence": {"identity_contract", "file_contract"},
-    "http_auth": {"identity_contract"},
-    "file_attachment": {"identity_contract", "file_contract"},
+    # file_attachment: FileError codes + path helpers must stay aligned with file
+    "file_attachment": {"file_contract"},
 }
 
 
