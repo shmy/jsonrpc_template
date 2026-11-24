@@ -11,7 +11,7 @@ path = "lib.rs"
 workspace = true
 
 [dependencies]
-# 至少启用一个后端，便于独立 `cargo test -p file_attachment`；与 api 的 cos/fs 会 feature 统一
+# 至少启用一个后端，便于独立 `cargo test -p file_attachment`；与 app 的 cos/fs 会 feature 统一
 blob_kit = { workspace = true, features = ["fs"] }
 cache_kit = { workspace = true }
 file_contract = { workspace = true }

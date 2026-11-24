@@ -120,8 +120,8 @@ fn provide_app_state(db: Db, cache: Cache, blob: Blob, cli: Cli) -> AppState {
     )
 }
 
-/// API 版本（`/openrpc.json` `info.version`）。由组合根（`bin/api`）supply——
-/// OpenRPC 描述的是「发布出去的 API」，版本应取自发布该 API 的二进制（`api`），
+/// API 版本（`/openrpc.json` `info.version`）。由组合根（`bin/app`）supply——
+/// OpenRPC 描述的是「发布出去的 API」，版本应取自发布该面的二进制（`app`），
 /// 而非本壳 crate 的 `CARGO_PKG_VERSION`（两者各自演进时会漂移）。
 #[derive(Clone, Debug)]
 pub struct OpenRpcVersion(pub &'static str);

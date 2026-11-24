@@ -1,4 +1,4 @@
-//! 最小 feature：`module()` 只做注册，业务细节放 `methods/` / `shared/`。
+//! 最小 app 表面：`module()` 只做注册，业务细节放 `methods/` / `shared/`。
 
 use app_state::AppState;
 use axum_jsonrpc::{RegisterError, RpcRouter};

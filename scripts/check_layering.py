@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Enforce workspace crate layering (see AGENTS.md).
 
+Surfaces: app/* (C-end) and ops/* (reserved; add when ready).
+Contracts: contracts/*_contract (shared wire/models).
+
 Forbidden:
-  - features/* → features/* (implementation crates)
-  - features/*_contract → features/* (any feature impl)
-  - features/* → http_server
-  - crates/* → features/* | infra/* (except none)
-  - infra/* → features/* (implementation); contract only via allowlist
+  - app/* → app/* | ops/* (implementation crates)
+  - ops/* → ops/* | app/* (implementation crates)
+  - contracts/* → app/* | ops/*
+  - app|ops → http_server
+  - crates/* → app|ops|contracts|infra
+  - infra/* → app|ops; contract only via allowlist
 
 Allowed infra → *_contract (frozen; new entries need script + AGENTS + rationale):
   - persistence → identity_contract, file_contract  (toasty models! only)
@@ -28,24 +32,24 @@ DEP_RE = re.compile(
     re.M,
 )
 SIMPLE_PATH_RE = re.compile(
-    r'^(?P<name>[A-Za-z0-9_-]+)\s*=\s*\{[^}]*workspace\s*=\s*true',
+    r"^(?P<name>[A-Za-z0-9_-]+)\s*=\s*\{[^}]*workspace\s*=\s*true",
     re.M,
 )
 
 # package name → (layer, kind)
-# layer: bin | feature | contract | infra | crate
-# kind for feature/contract: name without suffix
+# layer: bin | app | ops | contract | infra | crate
 
 
 def classify(rel: Path) -> tuple[str, str]:
     parts = rel.parts
     if parts[0] == "bin":
         return "bin", parts[1]
-    if parts[0] == "features":
-        name = parts[1]
-        if name.endswith("_contract"):
-            return "contract", name
-        return "feature", name
+    if parts[0] == "app":
+        return "app", parts[1]
+    if parts[0] == "ops":
+        return "ops", parts[1]
+    if parts[0] == "contracts":
+        return "contract", parts[1]
     if parts[0] == "infra":
         return "infra", parts[1]
     if parts[0] == "crates":
@@ -63,7 +67,6 @@ def package_name(cargo_toml: Path) -> str:
 
 def workspace_members() -> list[Path]:
     root_toml = (ROOT / "Cargo.toml").read_text()
-    # members = [ "a", "b", ... ]
     m = re.search(r"members\s*=\s*\[(.*?)\]", root_toml, re.S)
     if not m:
         raise SystemExit("no workspace.members")
@@ -74,14 +77,10 @@ def deps_of(cargo_toml: Path) -> set[str]:
     """Return workspace/path dependency package names (deps + dev-deps + build)."""
     text = cargo_toml.read_text()
     names: set[str] = set()
-    # workspace = true deps
     for m in SIMPLE_PATH_RE.finditer(text):
         names.add(m.group("name"))
-    # path = "..." deps (local)
     for m in DEP_RE.finditer(text):
         names.add(m.group("name"))
-    # also `foo = { workspace = true, ...}` already covered
-    # feature-activated optional same names
     return names
 
 
@@ -101,50 +100,47 @@ def main() -> int:
     for member in members:
         cargo = member / "Cargo.toml"
         if not cargo.is_file():
-            # flat bin layout: bin/api/Cargo.toml
-            cargo = member.joinpath("Cargo.toml")
-        if not cargo.is_file():
-            # try as file path itself is the crate dir
             continue
         name = package_name(cargo)
         layer, kind = classify(member.relative_to(ROOT))
         pkg_to_meta[name] = (layer, kind, member)
 
-    # Also map by directory package for path resolution
     errors: list[str] = []
 
-    feature_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "feature"}
+    app_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "app"}
+    ops_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "ops"}
+    surface_impls = app_impls | ops_impls
     contracts = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "contract"}
     infras = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "infra"}
     kits = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "crate"}
 
-    for name, (layer, kind, member) in sorted(pkg_to_meta.items()):
+    for name, (layer, _kind, member) in sorted(pkg_to_meta.items()):
         cargo = member / "Cargo.toml"
         deps = deps_of(cargo) & set(pkg_to_meta.keys())
 
-        if layer == "feature":
-            bad_feat = deps & feature_impls - {name}
-            if bad_feat:
-                errors.append(f"{name}: feature must not depend on other features {sorted(bad_feat)}")
+        if layer in {"app", "ops"}:
+            bad_surf = deps & surface_impls - {name}
+            if bad_surf:
+                errors.append(
+                    f"{name}: {layer} must not depend on other surface impls {sorted(bad_surf)}"
+                )
             if "http_server" in deps:
-                errors.append(f"{name}: feature must not depend on http_server")
+                errors.append(f"{name}: {layer} must not depend on http_server")
 
         if layer == "contract":
-            bad = deps & feature_impls
+            bad = deps & surface_impls
             if bad:
-                errors.append(f"{name}: contract must not depend on features {sorted(bad)}")
-            # contracts should not depend on other contracts with business logic — soft, skip
+                errors.append(f"{name}: contract must not depend on surfaces {sorted(bad)}")
 
         if layer == "crate":
-            bad = (deps & feature_impls) | (deps & contracts) | (deps & infras)
-            # kits may depend on other kits; forbid template layers
+            bad = (deps & surface_impls) | (deps & contracts) | (deps & infras)
             if bad:
                 errors.append(f"{name}: crate/kit must not depend on template layers {sorted(bad)}")
 
         if layer == "infra":
-            bad_feat = deps & feature_impls
-            if bad_feat:
-                errors.append(f"{name}: infra must not depend on feature impls {sorted(bad_feat)}")
+            bad_surf = deps & surface_impls
+            if bad_surf:
+                errors.append(f"{name}: infra must not depend on surface impls {sorted(bad_surf)}")
             contract_deps = deps & contracts
             allowed = INFRA_CONTRACT_ALLOW.get(name, set())
             extra = contract_deps - allowed
@@ -161,7 +157,7 @@ def main() -> int:
 
     print(
         f"layering OK ({len(pkg_to_meta)} crates; "
-        f"{len(feature_impls)} features, {len(contracts)} contracts, "
+        f"{len(app_impls)} app, {len(ops_impls)} ops, {len(contracts)} contracts, "
         f"{len(infras)} infra, {len(kits)} crates)"
     )
     return 0

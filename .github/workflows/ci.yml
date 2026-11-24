@@ -30,12 +30,14 @@ jobs:
       - name: fmt
         run: cargo fmt --all -- --check
       - name: layering
-        run: python3 scripts/check_layering.py
+        run: |
+          python3 scripts/check_layering.py
+          python3 scripts/check_module_order.py
       - name: clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: api default-features
+      - name: app default-features
         # e2e 关 otlp；这里覆盖默认 otlp+blob-fs
-        run: cargo check -p api --all-targets
+        run: cargo check -p app --all-targets
 
   test:
     runs-on: ubuntu-latest
@@ -104,9 +106,9 @@ jobs:
             "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl_${HURL_VERSION}_amd64.deb"
           sudo apt-get update
           sudo apt-get install -y "./hurl_${HURL_VERSION}_amd64.deb" postgresql-client redis-tools
-      - name: Build migrator + api
+      - name: Build migrator + app
         run: |
           cargo build --bin migrator
-          cargo build -p api --no-default-features --features blob-fs
+          cargo build -p app --no-default-features --features blob-fs
       - name: e2e
         run: stdbuf -oL -eL just e2e

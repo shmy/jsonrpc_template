@@ -1,6 +1,6 @@
 //! 正式对象引用登记：commit（staging→正式）/ attach / detach。
 //!
-//! 从 `features/file` 下沉，供多业务复用（勿再让 feature 互依实现 crate）。
+//! 从 `app/file` 下沉，供多业务复用（勿再让 feature 互依实现 crate）。
 //! staging 对象仍由 file 的 `staging_gc` 清理；本 crate 只跟踪转正后的 path。
 //! 持有正式 blob 引用的业务 feature 须在 `module()` 里
 //! [`register_attachment_in_use`]，供 AttachmentGc 安全网合并。

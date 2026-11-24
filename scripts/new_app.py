@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scaffold a leaf feature from docs/feature-template/ into features/<name>/."""
+"""Scaffold a leaf app surface crate from docs/app-template/ into app/<name>/."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE = ROOT / "docs" / "feature-template"
-FEATURES = ROOT / "features"
+TEMPLATE = ROOT / "docs" / "app-template"
+APP = ROOT / "app"
 ROOT_TOML = ROOT / "Cargo.toml"
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -18,7 +18,7 @@ PKG_NAME_RE = re.compile(r'(?m)^name\s*=\s*"([^"]+)"')
 
 
 def die(msg: str) -> None:
-    print(f"new-feature FAILED: {msg}", file=sys.stderr)
+    print(f"new-app FAILED: {msg}", file=sys.stderr)
     raise SystemExit(1)
 
 
@@ -50,7 +50,7 @@ def rewrite(text: str, name: str) -> str:
 
 
 def copy_tree(name: str) -> Path:
-    dest = FEATURES / name
+    dest = APP / name
     if dest.exists():
         die(f"{dest} already exists")
     if not TEMPLATE.is_dir():
@@ -60,7 +60,6 @@ def copy_tree(name: str) -> Path:
         if src.is_dir():
             continue
         rel = src.relative_to(TEMPLATE)
-        # Skip README from becoming feature docs; keep template README as docs only
         if rel.as_posix() == "README.md":
             continue
         target = dest / rel
@@ -72,36 +71,37 @@ def copy_tree(name: str) -> Path:
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
-        print("usage: just new-feature <name>", file=sys.stderr)
-        print("  name: snake_case leaf feature (e.g. billing)", file=sys.stderr)
+        print("usage: just new-app <name>", file=sys.stderr)
+        print("  name: snake_case app surface (e.g. billing)", file=sys.stderr)
         return 2
     name = argv[1]
     if not NAME_RE.match(name):
         die("name must match ^[a-z][a-z0-9_]*$")
     if name.endswith("_contract"):
-        die("pass the feature name without _contract; create contract separately if needed")
+        die("pass the surface name without _contract; create contracts/<name>_contract separately")
 
     taken = workspace_package_names()
     if name in taken:
         die(
             f"package name `{name}` already used by a workspace member "
-            f"(also ensure features/{name} does not already exist)"
+            f"(also ensure app/{name} does not already exist)"
         )
 
     dest = copy_tree(name)
     print(f"scaffolded {dest.relative_to(ROOT)}")
     print()
     print("Next steps:")
-    print(f"  1. Add \"features/{name}\" to workspace.members in Cargo.toml")
-    print(f"  2. Add {name} = {{ version = \"0.1.0\", path = \"features/{name}\" }}")
-    print(f"     under [workspace.dependencies]")
-    print(f"  3. bin/api/Cargo.toml: depend on {name}; main.rs:")
+    print(f'  1. Add "app/{name}" to workspace.members in Cargo.toml')
+    print(f'  2. Add {name} = {{ version = "0.1.0", path = "app/{name}" }}')
+    print("     under [workspace.dependencies]")
+    print(f"  3. bin/app/Cargo.toml: depend on {name}; main.rs:")
     print(f"       .module({name}::module())  // BEFORE http_server")
     print("  4. Domain errors → shared/l10n.rs + locales (use locale::register_locale_bundle)")
-    print("  5. Optional *_contract → persistence toasty::models! + just migration-generate")
+    print("  5. Optional contracts/<name>_contract → persistence toasty::models! + just migration-generate")
     print(f"  6. just layering && just check-fast {name}")
     print()
-    print("Checklist: docs/feature-template/README.md")
+    print("Checklist: docs/app-template/README.md")
+    print("Later ops surfaces go under ops/ (not created yet); same rules, separate bin.")
     return 0
 
 

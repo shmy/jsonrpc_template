@@ -24,9 +24,9 @@ async fn main() -> Result<()> {
 
     Modrun::builder()
         .supply(cli)
-        // OpenRPC info.version 取 api 二进制自身的版本，而非 http_server 壳 crate 的版本
+        // OpenRPC info.version 取 app 二进制自身的版本，而非 http_server 壳 crate 的版本
         .supply(http_server::OpenRpcVersion(env!("CARGO_PKG_VERSION")))
-        // Contribution groups: features append via provide_group*; empty groups stay valid.
+        // Contribution groups: app surfaces append via provide_group*; empty groups stay valid.
         .init_group::<PublicRouter>()
         .init_group::<PrivateRouter>()
         .init_group::<ProbeRouter>()

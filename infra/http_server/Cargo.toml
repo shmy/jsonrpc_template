@@ -9,7 +9,7 @@ path = "lib.rs"
 
 [features]
 default = []
-# 由 api feature `otlp` 开启；RPC metrics + 入站 W3C Trace Context
+# 由 app feature `otlp` 开启；RPC metrics + 入站 W3C Trace Context
 otel = [
     "dep:trace_kit",
     "dep:axum-tracing-opentelemetry",

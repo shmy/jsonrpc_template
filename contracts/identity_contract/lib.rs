@@ -1,7 +1,7 @@
 //! Identity bounded-context persistence models (toasty).
 //!
-//! Layering: other `features/*` may depend on this crate only — never on
-//! `identity`. This crate must not depend on any feature implementation.
+//! Layering: `app/*` / future `ops/*` may depend on this crate only — never on
+//! `identity`. This crate must not depend on any surface implementation.
 
 pub mod error;
 pub mod models;

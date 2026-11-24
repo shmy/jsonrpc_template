@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "bin/api",
+    "bin/app",
     "bin/migrator",
     "bin/gen_mobile_clients",
     "crates/account_id",
@@ -13,11 +13,11 @@ members = [
     "crates/image_kit",
     "crates/jwt_kit",
     "crates/trace_kit",
-    "features/file",
-    "features/file_contract",
-    "features/identity",
-    "features/identity_contract",
-    "features/probe",
+    "app/file",
+    "app/identity",
+    "app/probe",
+    "contracts/file_contract",
+    "contracts/identity_contract",
     "infra/app_state",
     "infra/blob",
     "infra/cache",
@@ -33,7 +33,7 @@ members = [
 resolver = "3"
 
 [workspace.dependencies]
-# 默认仅 console；OTLP/metrics 由 api feature `otlp` 开启
+# 默认仅 console；OTLP/metrics 由 app feature `otlp` 开启
 trace_kit = { version = "0.1.0", path = "crates/trace_kit", default-features = false, features = [
     "console",
 ] }
@@ -108,7 +108,7 @@ tracing-opentelemetry = { version = "0.34", default-features = false, features =
 axum-tracing-opentelemetry = { version = "0.42", default-features = false }
 getrandom = { version = "0.4", default-features = false, features = ["std"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
-identity = { version = "0.1.0", path = "features/identity" }
+identity = { version = "0.1.0", path = "app/identity" }
 clap = { version = "4.5", default-features = false, features = [
     "derive",
     "env",
@@ -120,7 +120,7 @@ secrecy = { version = "0.10", default-features = false }
 app_state = { version = "0.1.0", path = "infra/app_state" }
 config = { version = "0.1.0", path = "infra/config" }
 locale = { version = "0.1.0", path = "infra/locale" }
-probe = { version = "0.1.0", path = "features/probe" }
+probe = { version = "0.1.0", path = "app/probe" }
 thiserror = { version = "2", default-features = false }
 unic-langid = { version = "0.9", default-features = false }
 fluent-bundle = { version = "0.16", default-features = false }
@@ -133,7 +133,7 @@ toasty = { version = "0.11", default-features = false, features = [
 toasty-cli = { version = "0.11", default-features = false }
 jiff = { version = "0.2", default-features = false, features = ["serde"] }
 persistence = { version = "0.1.0", path = "infra/persistence" }
-identity_contract = { version = "0.1.0", path = "features/identity_contract" }
+identity_contract = { version = "0.1.0", path = "contracts/identity_contract" }
 account_id = { version = "0.1.0", path = "crates/account_id" }
 itoa = { version = "1", default-features = false }
 tsid = { version = "0.3", default-features = false }
@@ -186,8 +186,8 @@ blob_kit = { version = "0.1.0", path = "crates/blob_kit", default-features = fal
 blob = { version = "0.1.0", path = "infra/blob", default-features = false }
 image_kit = { version = "0.1.0", path = "crates/image_kit" }
 file_attachment = { version = "0.1.0", path = "infra/file_attachment" }
-file = { version = "0.1.0", path = "features/file", default-features = false }
-file_contract = { version = "0.1.0", path = "features/file_contract" }
+file = { version = "0.1.0", path = "app/file", default-features = false }
+file_contract = { version = "0.1.0", path = "contracts/file_contract" }
 mime_guess = { version = "2.0", default-features = false }
 image = { version = "0.25", default-features = false, features = [
     "jpeg",

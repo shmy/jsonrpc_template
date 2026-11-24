@@ -4,7 +4,7 @@ set dotenv-load := true
 # ── 日常 ──────────────────────────────────────────────
 
 dev:
-    cargo watch -x "run -p api"
+    cargo watch -x "run -p app"
 
 db-up:
     docker compose up -d
@@ -31,21 +31,21 @@ lint crate:
     cargo clippy -p {{crate}} --all-targets
 
 check:
-    cargo check -p api
+    cargo check -p app
 
 # 叶子迭代；勿与 --all-features / 全 workspace 混用（会触发 feature 统一化）
 check-fast crate="identity":
     cargo check -p {{crate}}
 
-# 从 docs/feature-template 复制叶子 feature 骨架（不改 workspace / bin/api）
-new-feature name:
-    python3 scripts/new_feature.py {{name}}
+# 从 docs/app-template 复制叶子 app 表面骨架（不改 workspace / bin/app）
+new-app name:
+    python3 scripts/new_app.py {{name}}
 
 layering:
     python3 scripts/check_layering.py
     python3 scripts/check_module_order.py
 
-# 拉取 /openrpc.json → .clients/（Swift/Kotlin/Dart/TS；api 需在听；已有缓存可只跑后半段）
+# 拉取 /openrpc.json → .clients/（Swift/Kotlin/Dart/TS；app 需在听；已有缓存可只跑后半段）
 gen-clients url="http://127.0.0.1:9000/openrpc.json":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -120,8 +120,8 @@ e2e:
     : "${CACHE_REDIS_URL:?CACHE_REDIS_URL required}"
     listen="${E2E_LISTEN_ADDR:-127.0.0.1:18080}"
     base_url="${E2E_BASE_URL:-http://${listen}}"
-    api_bin="${CARGO_TARGET_DIR:-target}/debug/api"
-    api_log="${TMPDIR:-/tmp}/jsonrpc-e2e-api.log"
+    app_bin="${CARGO_TARGET_DIR:-target}/debug/app"
+    app_log="${TMPDIR:-/tmp}/jsonrpc-e2e-app.log"
 
     log "e2e: [1/5] migration-reset"
     just migration-reset
@@ -135,9 +135,9 @@ e2e:
         | nc -N -w 2 127.0.0.1 6379 >/dev/null || true
     fi
 
-    log "e2e: [3/5] build + start api on $listen"
-    cargo build -p api --no-default-features --features blob-fs
-    : >"$api_log"
+    log "e2e: [3/5] build + start app on $listen"
+    cargo build -p app --no-default-features --features blob-fs
+    : >"$app_log"
     # REFRESH_GRACE_TTL=0：关闭宽限，保留「旧 refresh 重放 → -32004 吊销」断言；
     # 宽限幂等路径由 identity token_ops 单测覆盖。
     MASTER=true \
@@ -153,27 +153,27 @@ e2e:
     BLOB_FS_DOMAIN="${base_url}/files" \
     BLOB_FS_PRESIGN_SECRET="${BLOB_FS_PRESIGN_SECRET:-e2e-blob-presign-secret-at-least-32b}" \
     CACHE_REDIS_URL="redis://127.0.0.1:6379/14" \
-      "$api_bin" --listen-addr "$listen" >>"$api_log" 2>&1 &
-    api_pid=$!
+      "$app_bin" --listen-addr "$listen" >>"$app_log" 2>&1 &
+    app_pid=$!
     cleanup() {
-      kill "$api_pid" 2>/dev/null || true
-      for _ in $(seq 1 50); do kill -0 "$api_pid" 2>/dev/null || break; sleep 0.1; done
-      kill -9 "$api_pid" 2>/dev/null || true
-      wait "$api_pid" 2>/dev/null || true
+      kill "$app_pid" 2>/dev/null || true
+      for _ in $(seq 1 50); do kill -0 "$app_pid" 2>/dev/null || break; sleep 0.1; done
+      kill -9 "$app_pid" 2>/dev/null || true
+      wait "$app_pid" 2>/dev/null || true
     }
     trap cleanup EXIT
 
-    log "e2e: [4/5] wait /healthz (pid=$api_pid)"
+    log "e2e: [4/5] wait /healthz (pid=$app_pid)"
     ready=0
     for i in $(seq 1 80); do
       if curl -sf "$base_url/healthz" >/dev/null; then
         ready=1
-        log "e2e: api ready (${i}/80)"
+        log "e2e: app ready (${i}/80)"
         break
       fi
-      if ! kill -0 "$api_pid" 2>/dev/null; then
-        log "e2e: api exited before /healthz; log:"
-        cat "$api_log" >&2 || true
+      if ! kill -0 "$app_pid" 2>/dev/null; then
+        log "e2e: app exited before /healthz; log:"
+        cat "$app_log" >&2 || true
         exit 1
       fi
       if (( i % 10 == 0 )); then
@@ -183,7 +183,7 @@ e2e:
     done
     if [[ "$ready" -ne 1 ]]; then
       log "e2e: /healthz not ready after ~20s; log:"
-      cat "$api_log" >&2 || true
+      cat "$app_log" >&2 || true
       exit 1
     fi
 

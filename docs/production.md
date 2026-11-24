@@ -45,15 +45,15 @@ server {
 ## 多实例
 
 - 仅一个进程 `MASTER=true`（migrate + seed + blob GC）；其余 `MASTER=false`（默认）。
-- Schema 也可不经 api：`just migration-apply`。
+- Schema 也可不经 app：`just migration-apply`。
 - 会话在 Redis；JWT 密钥与 `BLOB_FS_PRESIGN_SECRET` 全实例一致。
 
-## 本地依赖（compose 不含 api）
+## 本地依赖（compose 不含 app）
 
 ```bash
 just db-up             # 仅 Postgres + Redis
 # DATABASE_URL → …@127.0.0.1:5433/… ；CACHE_REDIS_URL → redis://127.0.0.1:6380
-cargo run -p api
+cargo run -p app
 ```
 
-生产用二进制 / 编排自行部署；不要用 compose 跑 api。
+生产用二进制 / 编排自行部署；不要用 compose 跑 app。
