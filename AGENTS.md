@@ -29,7 +29,7 @@ bin/app                    # C 端组合根：CLI supply + module 注册
 |------|------|----------|
 | `crates/axum_jsonrpc*` | 解析、batch、limits、Handler、Observer、trace_id；`RpcRouter` / `ReadyRpcRouter` | 低（宽依赖，API 求稳） |
 | `crates/blob_kit` | OpenDAL 对象存储门面（fs / 腾讯 COS / test-utils） | 低 |
-| `infra/app_state` | 进程级 `AppState`（`Db` + `Cache` + `Blob` + `TokenHelper` + `FromRef`） | 中（加资源时扩展） |
+| `infra/app_state` | 进程级 `AppState`（`Db` + `Cache` + `Blob` + `TokenHelper` + `TrustedProxies` + `AuthRateLimit` / `LoginPhoneRate` + `FromRef`） | 中（加资源时扩展） |
 | `infra/blob` | OpenDAL `Blob` provide（feature `fs` / `cos`；cos 优先；fs→`config/fs`：`BLOB_FS_ROOT` 有默认，`DOMAIN`/`PRESIGN_SECRET` 必填；cos→`config/cos` 必填 `BLOB_S3_*`） | 低 |
 | `infra/file_attachment` | staging claim / commit / attach / detach + **通用绑定编排**（`bind` / `AttachmentWrite` fresh-stale 引用计数协议；跨业务附件实现，勿让表面互依；identity avatar 为薄适配示范）；缩略图 URL 约定 `?s=`（见 `thumb_public_url`；**仅正式 path**，`staging/` 禁止派生）；purge 清派生缓存 | 中 |
 | `crates/image_kit` | 纯图像派生（decode → max-edge → webp）；fs `GET ?s=` 内 `spawn_blocking` 调用 | 低 |
@@ -46,6 +46,8 @@ bin/app                    # C 端组合根：CLI supply + module 注册
 | `ops/*` | 管理端表面（**预留**，尚未建目录） | — |
 | `contracts/*` | 跨表面契约（toasty 模型等）；**不**依赖 app/ops 实现 | 中 |
 | `bin/app` | C 端组装入口（默认 `otlp`+`blob-fs`；可切 `blob-cos`） | 低 |
+| `bin/migrator` | toasty migration CLI（generate / apply；不经 app 启动） | 低 |
+| `bin/gen_mobile_clients` | 从 OpenRPC 生成移动端客户端 | 低 |
 
 **禁止（`just layering` / CI 会拦硬违规）：**
 
@@ -53,7 +55,7 @@ bin/app                    # C 端组合根：CLI supply + module 注册
 - 把 `PublicRpc` / `PrivateRpc` 塞回协议核（它们属于模板侧 `http_routing`）
 - app/ops 依赖 `http_server`（用 `app_state` / `http_routing` / `axum_jsonrpc` / `locale`）
 - **app/ops 表面实现互依禁止**——只能依赖 `contracts/*`（例：可用 `identity_contract`，禁止依赖 `identity`）。附件实现走 `infra/file_attachment`（通用绑定编排 `file_attachment::bind` + fresh/stale 时序；identity `avatar_ops` 为薄适配示范，新业务勿复制粘贴它的实现）
-- `contracts/*` 依赖任何 app/ops 实现，或互相堆业务逻辑（契约保持薄：**只放 wire 形态（新类型/schema/稳定错误码）**，含业务语义的规则落表面实现）。staging 前缀权威在 `blob_kit::STAGING_PREFIX`；`file_contract::STORAGE_DIR_PREFIX` 为镜像，由 `file` 单测锁死相等
+- `contracts/*` 依赖任何 app/ops 实现，或互相堆业务逻辑（契约保持薄：**wire 形态（新类型/schema/稳定错误码）+ 跨表面共享的纯校验/路径约定**；含副作用的编排与 IO 落表面或 infra）。staging 前缀权威在 `blob_kit::STAGING_PREFIX`；`file_contract::STORAGE_DIR_PREFIX` 为镜像，由 `file` 单测锁死相等
 - infra 依赖 `contracts/*`——**仅允许下列例外**（冻结；新增须改 `scripts/check_layering.py` + 本表并写明理由）：
   1. `persistence`：`toasty::models!(…)` **注册**各 `*_contract` 模型（落库壳，不写业务）
   2. `file_attachment`：域错误 / 路径约定借用 `file_contract`（附件实现与 file 契约对齐，勿让表面互依）
@@ -64,7 +66,7 @@ bin/app                    # C 端组合根：CLI supply + module 注册
 
 1. 表面用 **`RpcRouter::<AppState>::new()`** 注册方法（**仅方法表**，不要 `with_state`）
 2. `persistence::module()` 异步提供**进程级** `Db`；`cache::module()` 提供 Redis `Cache`；`blob::module()` 提供 `Blob`；仅当 **`MASTER=true`** 时 apply embedded migrations、seed 管理员、启动 file staging/attachment GC（`MASTER` 默认 `false`；多实例只开一个 master，或用 `just migration-apply`）
-3. `http_server` 将 `Db` + `Cache` + `Blob` + `TokenHelper` 包成 `AppState`（含进程级配额 `AuthRateLimit` / `LoginPhoneRate`，来自 `RATE_LIMIT_*`）；`merge_rpc` 合并 `PublicRpc` +（`PrivateRpc` 经 `before_each(require_authed_account)`）后 **`.with_state(process_state)`** → `ReadyRpcRouter`；`/jsonrpc` 挂软鉴权（有 Bearer 则验签写 `AuthedAccount`/`AuthnError`）；`PrivateRouter` 挂强制鉴权。Body limit：**`BODY_LIMIT_BYTES`（默认 1 MiB）只套 RPC + PrivateRouter**；**PublicRouter 统一 `PUBLIC_BODY_LIMIT_BYTES`（16 MiB）**。公开写接口若要更严，在路由上挂**更小**的 `DefaultBodyLimit`；切勿用更小的外层 limit 包住更大上传路由。限流：无全站中间件；贵路径在 method 内调 `AuthRateLimit::allow` / `LoginPhoneRate::allow` / `Cache::allow_sliding_window`（示范 identity `rate_limit`，配额可配勿硬编码）；生产全站限流放网关
+3. `http_server` 将 `Db` + `Cache` + `Blob` + `TokenHelper` + `TrustedProxies` + 限流配额包成 `AppState`（`AuthRateLimit` / `LoginPhoneRate`，来自 `RATE_LIMIT_*`）；`merge_rpc` 合并 `PublicRpc` +（`PrivateRpc` 经 `before_each(require_authed_account)`）后 **`.with_state(process_state)`** → `ReadyRpcRouter`；`/jsonrpc` 挂软鉴权（有 Bearer 则验签写 `AuthedAccount`/`AuthnError`）；`PrivateRouter` 挂强制鉴权（当前无贡献路由，预留）。Body limit：**`BODY_LIMIT_BYTES`（默认 1 MiB）只套 RPC + PrivateRouter**；**PublicRouter 统一 `PUBLIC_BODY_LIMIT_BYTES`（16 MiB）**。公开写接口若要更严，在路由上挂**更小**的 `DefaultBodyLimit`；切勿用更小的外层 limit 包住更大上传路由。限流：无全站中间件；贵路径在 method 内调 `AuthRateLimit::allow` / `LoginPhoneRate::allow` / `Cache::allow_sliding_window`（示范 identity `rate_limit`，配额可配勿硬编码）；生产全站限流放网关
 
 表面路由器上的 state 在 merge 时**不会带上**；不要在表面里定制「自以为会生效」的 AppState。
 
@@ -140,7 +142,7 @@ app/<name>/
 - **跨表面共享**的领域错误放在 `*_contract`：`#[error("snake_case_key")]` + `rpc_code()`；基础设施失败不要包进该枚举
 - 套路：
   - Handler / helper：`rootcause::Result`；外库直接 `?`
-  - 领域失败：`Err(MyError::….into())`（表面在 `module()` 用 `locale::register_locale_bundle` 成对注册 FTL+mapper，且该 module 须在 `http_server` 之前）
+  - 领域失败：`Err(MyError::….into())`（表面在 `module()` 同步段用 `locale::register_locale_bundle` 成对注册 FTL+mapper；`check_module_order.py` 要求注册 locale 的表面排在 `http_server` 之前；seal 在 `http_server` invoke）
   - FTL：`app/<name>/locales/{en-US,zh-CN}/*.ftl`；`Display` / `l10n_key` 即 Fluent key
   - 临时非域错误可直接 `Result<T, ErrorObject>` / `Err(ErrorObject::new(...))`
   - `http_server` 启动前：`register_authn_locale()` → `seal_bundles` + `seal_domain_mappers`；漏注册 mapper 会把域错误打成 `-32603`；seal 后再 `register_*` 会 panic
@@ -163,8 +165,8 @@ app/<name>/
 - **少动宽依赖 crate**：改 `axum_jsonrpc` / `app_state` 公开 API 仍要克制（API 稳定是发布层面的承诺）——但**重编成本已实测不是障碍**：check-only 回路下，touch 表面方法只重检 2 个 crate（≈0.4s），touch 协议核全链 8 个也仅 ≈0.6s；最贵路径是 `axum_jsonrpc_macros`（proc-macro codegen，≈1.7s）
 - 依赖尽量 `default-features = false` + 显式 feature（workspace 已如此）
 - 日常迭代：`just check-fast <crate>`（默认 `identity`）或 `just check`（`-p app`）；**固定一种命令形态**——`-p` / `--workspace --all-targets` / `--all-features` 来回切会触发 feature 统一化补建（0.2–9s）
-- blob 后端只切 `app` 的 `blob-fs` / `blob-cos`（对齐表：`docs/blob-backends.md`）
-- 分层：`just layering`（`scripts/check_layering.py`；亦挂在 `pre_commit` / CI）
+- blob 后端只切 `app` 的 `blob-fs` / `blob-cos`（对齐表：`docs/blob-backends.md`；workspace 已对 `app_state` 等关 default-features，cos 构建不拉 fs）
+- 分层：`just layering`（`scripts/check_layering.py` + `check_module_order.py`；亦挂在 `pre_commit` / CI）
 
 ## 代码规范
 

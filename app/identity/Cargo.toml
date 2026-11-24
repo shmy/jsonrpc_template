@@ -7,6 +7,13 @@ publish = false
 [lib]
 path = "lib.rs"
 
+[features]
+# 叶子 `cargo check -p identity` 默认 fs；组合根经 workspace
+# default-features=false，由 app 的 blob-fs|blob-cos → file 统一打开。
+default = ["blob-fs"]
+blob-fs = ["app_state/blob-fs", "file_attachment/fs", "blob_kit/fs"]
+blob-cos = ["app_state/blob-cos", "file_attachment/cos", "blob_kit/cos"]
+
 [dependencies]
 rootcause = { workspace = true }
 serde = { workspace = true }

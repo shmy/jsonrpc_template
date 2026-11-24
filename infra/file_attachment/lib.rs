@@ -14,7 +14,9 @@ use std::time::Duration;
 use account_id::Id;
 use blob_kit::{Blob, BlobError, is_staging_object_path, resolve_staging_move_paths};
 use cache_kit::Cache;
-use file_contract::{DEFAULT_DERIVE_SIZE, FileError, derived_cache_paths, thumb_object_path};
+#[cfg(feature = "fs")]
+use file_contract::{DEFAULT_DERIVE_SIZE, thumb_object_path};
+use file_contract::{FileError, derived_cache_paths};
 use rootcause::Result;
 use toasty::sql::query;
 use toasty::sql::statement;
@@ -80,17 +82,25 @@ fn clear_attachment_in_use_collectors_for_test() {
 /// 由正式 path / 本站 fill_url 派生缩略图公网 URL。
 ///
 /// - **fs**：`…/id.ext?s=256`（同进程按需派生；`s` = 最长边）
-/// - **cos / 其它**：`None`（无同进程 `?s=`；勿拼假参数）
+/// - **cos / 无 `fs` feature**：`None`（无同进程 `?s=`；勿拼假参数）
 #[must_use]
 pub fn thumb_public_url(blob: &Blob, formal_or_url: &str) -> Option<String> {
-    // 仅 fs 实现 URL 派生；cos 等不要谎称 `?s=`。
-    let _ = blob.as_fs()?;
-    let stripped = blob.strip_public_url_prefix(formal_or_url.trim());
-    let path = stripped.as_ref();
-    // staging / 非图 / 已派生 → None（与 `derived_object_path` 对齐）。
-    let _ = thumb_object_path(path)?;
-    let base = blob.fill_public_url(path);
-    Some(format!("{base}?s={DEFAULT_DERIVE_SIZE}"))
+    #[cfg(feature = "fs")]
+    {
+        // 仅 fs 实现 URL 派生；运行时若不是 Fs 变体也返回 None。
+        let _ = blob.as_fs()?;
+        let stripped = blob.strip_public_url_prefix(formal_or_url.trim());
+        let path = stripped.as_ref();
+        // staging / 非图 / 已派生 → None（与 `derived_object_path` 对齐）。
+        let _ = thumb_object_path(path)?;
+        let base = blob.fill_public_url(path);
+        Some(format!("{base}?s={DEFAULT_DERIVE_SIZE}"))
+    }
+    #[cfg(not(feature = "fs"))]
+    {
+        let _ = (blob, formal_or_url);
+        None
+    }
 }
 
 /// pending commit（refcount=0 且未 tombstone）超过此时长可被 AttachmentGc 回收。
@@ -338,6 +348,7 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
+    use file_contract::{DEFAULT_DERIVE_SIZE, thumb_object_path};
 
     #[test]
     fn filter_gc_candidates_skips_in_use() {

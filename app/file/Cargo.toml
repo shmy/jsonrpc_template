@@ -9,8 +9,18 @@ path = "lib.rs"
 
 [features]
 default = []
-blob-fs = ["blob_kit/fs", "app_state/blob-fs", "config/fs"]
-blob-cos = ["blob_kit/cos", "app_state/blob-cos", "config/cos"]
+blob-fs = [
+    "blob_kit/fs",
+    "app_state/blob-fs",
+    "config/fs",
+    "file_attachment/fs",
+]
+blob-cos = [
+    "blob_kit/cos",
+    "app_state/blob-cos",
+    "config/cos",
+    "file_attachment/cos",
+]
 
 [dependencies]
 app_state = { workspace = true }

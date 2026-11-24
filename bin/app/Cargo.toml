@@ -12,8 +12,10 @@ path = "main.rs"
 default = ["otlp", "blob-fs"]
 otlp = ["trace_kit/otlp", "http_server/otel"]
 # Blob 后端 meta-feature：只在此切换；对齐表见 docs/blob-backends.md
-# blob-fs → blob/fs + file/blob-fs（→ app_state/blob-fs + config/fs）
-# blob-cos → blob/cos + file/blob-cos（对称）
+# workspace 对 app_state/file_attachment/identity/http_* 关了 default-features，
+# 因此 blob-cos 不会再经默认 feature 拉进 fs。
+# blob-fs → blob/fs + file/blob-fs（→ app_state/blob-fs + file_attachment/fs + config/fs）
+# blob-cos → blob/cos + file/blob-cos（对称，仅 cos）
 blob-fs = ["blob/fs", "file/blob-fs"]
 blob-cos = ["blob/cos", "file/blob-cos"]
 

@@ -37,8 +37,8 @@ resolver = "3"
 trace_kit = { version = "0.1.0", path = "crates/trace_kit", default-features = false, features = [
     "console",
 ] }
-http_server = { version = "0.1.0", path = "infra/http_server" }
-http_routing = { version = "0.1.0", path = "infra/http_routing" }
+http_server = { version = "0.1.0", path = "infra/http_server", default-features = false }
+http_routing = { version = "0.1.0", path = "infra/http_routing", default-features = false }
 axum_jsonrpc = { version = "0.1.0", path = "crates/axum_jsonrpc" }
 axum_jsonrpc_macros = { version = "0.1.0", path = "crates/axum_jsonrpc_macros" }
 axum_jsonrpc_openrpc = { version = "0.1.0", path = "crates/axum_jsonrpc_openrpc" }
@@ -108,7 +108,7 @@ tracing-opentelemetry = { version = "0.34", default-features = false, features =
 axum-tracing-opentelemetry = { version = "0.42", default-features = false }
 getrandom = { version = "0.4", default-features = false, features = ["std"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
-identity = { version = "0.1.0", path = "app/identity" }
+identity = { version = "0.1.0", path = "app/identity", default-features = false }
 clap = { version = "4.5", default-features = false, features = [
     "derive",
     "env",
@@ -117,10 +117,10 @@ clap = { version = "4.5", default-features = false, features = [
     "std",
 ] }
 secrecy = { version = "0.10", default-features = false }
-app_state = { version = "0.1.0", path = "infra/app_state" }
+app_state = { version = "0.1.0", path = "infra/app_state", default-features = false }
 config = { version = "0.1.0", path = "infra/config" }
 locale = { version = "0.1.0", path = "infra/locale" }
-probe = { version = "0.1.0", path = "app/probe" }
+probe = { version = "0.1.0", path = "app/probe", default-features = false }
 thiserror = { version = "2", default-features = false }
 unic-langid = { version = "0.9", default-features = false }
 fluent-bundle = { version = "0.16", default-features = false }
@@ -148,7 +148,7 @@ cache_kit = { version = "0.1.0", path = "crates/cache_kit", default-features = f
     "redis",
 ] }
 cache = { version = "0.1.0", path = "infra/cache" }
-http_auth = { version = "0.1.0", path = "infra/http_auth" }
+http_auth = { version = "0.1.0", path = "infra/http_auth", default-features = false }
 http_extractors = { version = "0.1.0", path = "infra/http_extractors" }
 tower-http = { version = "0.7", default-features = false, features = [
     "timeout",
@@ -185,7 +185,7 @@ tempoid = { version = "0.1", default-features = false }
 blob_kit = { version = "0.1.0", path = "crates/blob_kit", default-features = false }
 blob = { version = "0.1.0", path = "infra/blob", default-features = false }
 image_kit = { version = "0.1.0", path = "crates/image_kit" }
-file_attachment = { version = "0.1.0", path = "infra/file_attachment" }
+file_attachment = { version = "0.1.0", path = "infra/file_attachment", default-features = false }
 file = { version = "0.1.0", path = "app/file", default-features = false }
 file_contract = { version = "0.1.0", path = "contracts/file_contract" }
 mime_guess = { version = "2.0", default-features = false }

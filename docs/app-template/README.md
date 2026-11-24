@@ -11,10 +11,10 @@
 - [ ] `just new-app <name>`（或复制本目录）
 - [ ] 需要落库 / 跨表面共享类型 → 建 `contracts/<name>_contract/`，并在 `infra/persistence` `toasty::models!(…)` 注册 → `just migration-generate`
 - [ ] 根 `Cargo.toml`：`workspace.members` + `[workspace.dependencies]`；`bin/app` 依赖该 crate
-- [ ] `bin/app/main.rs`：`.module(<name>::module())`，**必须在 `http_server` 之前**（顺序由 `just layering` → `check_module_order.py` 拦，不必死记）
-- [ ] 有领域错误 → `module()` 同步段用 `locale::register_locale_bundle`（FTL + mapper **成对**；漏 mapper → `-32603`；seal 后再注册会 panic）
+- [ ] `bin/app/main.rs`：`.module(<name>::module())`，**排在 `http_server` 之前**（`just layering` → `check_module_order.py` 只拦「注册了 locale 的表面须在 http_server 前」）
+- [ ] 有领域错误 → `module()` 同步段用 `locale::register_locale_bundle`（FTL + mapper **成对**；漏 mapper → `-32603`；seal 在 `http_server` 的 invoke 里，seal 后再注册会 panic）
 - [ ] RPC：**默认 `PrivateRpc`**；仅 login/refresh 等匿名方法进 `PublicRpc`
-- [ ] 附件列 → `file_attachment::bind` + `register_attachment_in_use`（module 排在 `file` 前）
+- [ ] 附件列 → `file_attachment::bind` + `register_attachment_in_use`（`register_*` 在 `module()` 同步段即可；习惯上排在 `file` 前，脚本不强制）
 - [ ] `just layering` + `just check-fast <name>`
 
 authn FTL/mapper 由 `http_server` 统一注册，表面 **不要**再注册。

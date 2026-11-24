@@ -8,7 +8,11 @@ publish = false
 path = "lib.rs"
 
 [features]
-default = []
+# blob-*：单独 check/test 本 crate 时开；组合根经 workspace
+# default-features=false，由 app → file 的 blob feature 统一。
+default = ["blob-fs"]
+blob-fs = ["app_state/blob-fs", "blob_kit/fs", "http_auth/blob-fs", "http_routing/blob-fs"]
+blob-cos = ["app_state/blob-cos", "blob_kit/cos", "http_auth/blob-cos", "http_routing/blob-cos"]
 # 由 app feature `otlp` 开启；RPC metrics + 入站 W3C Trace Context
 otel = [
     "dep:trace_kit",

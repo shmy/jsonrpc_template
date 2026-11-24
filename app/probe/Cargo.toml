@@ -7,6 +7,11 @@ publish = false
 [lib]
 path = "lib.rs"
 
+[features]
+default = ["blob-fs"]
+blob-fs = ["app_state/blob-fs", "http_routing/blob-fs"]
+blob-cos = ["app_state/blob-cos", "http_routing/blob-cos"]
+
 [dependencies]
 app_state = { workspace = true }
 axum = { workspace = true }

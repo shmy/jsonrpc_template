@@ -10,9 +10,15 @@ path = "lib.rs"
 [lints]
 workspace = true
 
+[features]
+# 与 app 的 blob-fs / blob-cos 对齐；workspace 依赖 default-features=false，
+# 避免 blob-cos 组合根经本 crate 默认再拉进 fs。
+default = ["fs"]
+fs = ["blob_kit/fs"]
+cos = ["blob_kit/cos"]
+
 [dependencies]
-# 至少启用一个后端，便于独立 `cargo test -p file_attachment`；与 app 的 cos/fs 会 feature 统一
-blob_kit = { workspace = true, features = ["fs"] }
+blob_kit = { workspace = true }
 cache_kit = { workspace = true }
 file_contract = { workspace = true }
 # staging claim 所有者主键用中立 account_id（勿再借 identity_contract）

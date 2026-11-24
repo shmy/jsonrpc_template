@@ -65,6 +65,14 @@
 - [x] `image_kit` + fs URL 派生缩略图（`*_s{n}.webp` 缓存；旧 `_sm.webp` GC 仍清）
 - [x] 多语言客户端生成 + CI `clients-check`（OpenRPC 漂移 + bun session.test）
 
+## 产品化安全清单（模板故意不收紧；上线前自查）
+
+- [ ] 覆盖 `SEED_ADMIN_PASSWORD`（默认 `admin123!`）；生产勿依赖 `.env.example` 的 `MASTER=true`
+- [ ] `create` 加 privileged / 邀请码 / 关闭公开注册；按需收紧 `read`/`search`
+- [ ] 评估 `Account` DB 模型与 wire DTO 分离（或审计全部 `skip_serializing`）
+- [ ] blob-fs 多实例共享卷；或切 `blob-cos`
+- [ ] 第二组合根（`bin/ops`）前先收敛进程级 locale/mapper/in-use 全局，并把 token 签发下沉
+
 ## 验收标准（起步可用）
 
 1. 新人按 README（空库 + `MASTER=true` seed 管理员）能 login → `identity.account.create` 打通一次 RPC

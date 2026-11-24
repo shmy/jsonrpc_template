@@ -10,11 +10,11 @@
 
 ## 与服务端的关系（关键）
 
-`infra/http_server/lib.rs` 的 `docs_page()` 通过 **`concat!` + `include_str!`** 把
+`infra/http_server/docs.rs` 的 `docs_page()` 通过 **`concat!` + `include_str!`** 把
 `openrpc-viewer.min.js` **内联**进一个自包含 HTML，挂在 `GET /docs`（同源、免 CORS 配置）：
 
 ```text
-docs/openrpc-viewer.js  ──just docs-min（terser）──▶  openrpc-viewer.min.js  ──include_str!──▶  lib.rs::docs_page  ──▶  GET /docs
+docs/openrpc-viewer.js  ──just docs-min（terser）──▶  openrpc-viewer.min.js  ──include_str!──▶  docs.rs::docs_page  ──▶  GET /docs
 ```
 
 改 JS 后：跑 `just docs-min`（需要 node/npx，terser 钉主版本 5 保证产物稳定）。

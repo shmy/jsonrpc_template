@@ -35,9 +35,9 @@ async fn main() -> Result<()> {
         .module(persistence::module())
         .module(cache::module())
         .module(blob::module())
-        // Features register FTL + domain mappers / attachment in-use hooks
-        // here (before http_server seals at invoke). identity 先于 file，
-        // 以便 AttachmentGc 启动前 in-use 钩子已注册。
+        // 表面在 module() 同步段注册 FTL/mapper / attachment in-use；
+        // http_server 的 invoke 里 seal。check_module_order 要求注册
+        // locale 的表面排在 http_server 前。identity 习惯上先于 file。
         .module(identity::module())
         .module(file::module())
         .module(probe::module())

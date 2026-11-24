@@ -46,7 +46,9 @@ server {
 
 - 仅一个进程 `MASTER=true`（migrate + seed + blob GC）；其余 `MASTER=false`（默认）。
 - Schema 也可不经 app：`just migration-apply`。
-- 会话在 Redis；JWT 密钥与 `BLOB_FS_PRESIGN_SECRET` 全实例一致。
+- 会话在 Redis；JWT 密钥与（blob-fs 时）`BLOB_FS_PRESIGN_SECRET` 全实例一致。
+- **blob-fs**：对象与 `?s=` 派生缓存在本地盘——多实例须共享同一 `BLOB_FS_ROOT` 卷；否则 GC/读路径会按实例分裂。COS 无此约束。
+- 非 master 的 `readyz` 只探 Db/Redis，**不**等 migration 完成；滚动发布时先让 master migrate（或 `just migration-apply`）再放流量。
 
 ## 本地依赖（compose 不含 app）
 

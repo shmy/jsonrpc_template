@@ -38,6 +38,17 @@ jobs:
       - name: app default-features
         # e2e 关 otlp；这里覆盖默认 otlp+blob-fs
         run: cargo check -p app --all-targets
+      - name: app blob-cos (no fs)
+        # 编译期互斥：blob-cos 不得经 default-features 再拉进 blob_kit/fs
+        run: |
+          cargo check -p app --no-default-features --features blob-cos --all-targets
+          tree_out="$(cargo tree -p app --no-default-features --features blob-cos -e features -i blob_kit)"
+          if printf '%s\n' "$tree_out" | grep -F 'blob_kit feature "fs"'; then
+            echo 'blob-cos build must not enable blob_kit feature "fs"' >&2
+            printf '%s\n' "$tree_out" >&2
+            exit 1
+          fi
+          printf '%s\n' "$tree_out" | grep -F 'blob_kit feature "cos"'
 
   test:
     runs-on: ubuntu-latest
