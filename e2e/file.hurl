@@ -1,5 +1,5 @@
 # File 域：file.presign +（blob-fs）本地 PUT / 回源 + avatar commit
-# 依赖：种子管理员（见 seed_admin）；biz 需启用 blob-fs（just e2e 已带）
+# 依赖：种子管理员（见 seed_admin）；api 需启用 blob-fs（just e2e 已带）
 
 # 管理员登录
 POST {{base_url}}/jsonrpc

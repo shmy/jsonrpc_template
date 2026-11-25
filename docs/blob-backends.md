@@ -1,34 +1,34 @@
 # Blob 后端 Feature 对齐表
 
-`biz` 的 `blob-fs` / `blob-cos` 是组合根 meta-feature；下游 crate 必须同步打开对应 feature，否则会出现「blob provide 了 fs、file 路由却按 cos 编」之类的错配。
+`api` 的 `blob-fs` / `blob-cos` 是组合根 meta-feature；下游 crate 必须同步打开对应 feature，否则会出现「blob provide 了 fs、file 路由却按 cos 编」之类的错配。
 
-| 打开（二选一） | `biz` | `infra/blob` | `biz/file` | `infra/app_state` | `infra/file_attachment` | `infra/config` |
+| 打开（二选一） | `api` | `infra/blob` | `api/file` | `infra/app_state` | `infra/file_attachment` | `infra/config` |
 |----------------|-------|--------------|------------|-------------------|-------------------------|----------------|
 | 本地 FS（默认） | `blob-fs` | `fs` | `blob-fs` | `blob-fs` | `fs` | `fs` |
 | 腾讯 COS | `blob-cos` | `cos` | `blob-cos` | `blob-cos` | `cos` | `cos` |
 
-转发链（已在 `Cargo.toml` 写好，一般只改 `biz`）：
+转发链（已在 `Cargo.toml` 写好，一般只改 `api`）：
 
 ```text
-biz/blob-fs  → blob/fs + file/blob-fs
+api/blob-fs  → blob/fs + file/blob-fs
                blob/fs → config/fs + blob_kit/fs
                file/blob-fs → app_state/blob-fs + file_attachment/fs + config/fs + blob_kit/fs
 
-biz/blob-cos → blob/cos + file/blob-cos
+api/blob-cos → blob/cos + file/blob-cos
                blob/cos → config/cos + blob_kit/cos
                file/blob-cos → app_state/blob-cos + file_attachment/cos + config/cos + blob_kit/cos
 ```
 
-**编译期互斥**：workspace 对 `app_state` / `file_attachment` / `identity` / `http_server` / `http_auth` / `http_routing` / `probe` 使用 `default-features = false`。因此 `cargo check -p biz --no-default-features --features blob-cos` **不会**再经这些 crate 的默认 feature 拉进 `blob_kit/fs`。叶子单独 check（如 `just check-fast identity`）仍走各包自己的 `default = ["blob-fs"]`。
+**编译期互斥**：workspace 对 `app_state` / `file_attachment` / `identity` / `http_server` / `http_auth` / `http_routing` / `probe` 使用 `default-features = false`。因此 `cargo check -p api --no-default-features --features blob-cos` **不会**再经这些 crate 的默认 feature 拉进 `blob_kit/fs`。叶子单独 check（如 `just check-fast identity`）仍走各包自己的 `default = ["blob-fs"]`。
 
 `--all-features`（clippy CI）会同时打开 fs 与 cos，属有意并集，不代表生产二进制。
 
 规则：
 
-- **日常只切 `biz` feature**，勿单独 `cargo check -p file --features blob-cos` 又立刻 `cargo check -p biz --features blob-fs` 来回切（会触发 feature 统一化补建）。
+- **日常只切 `api` feature**，勿单独 `cargo check -p file --features blob-cos` 又立刻 `cargo check -p api --features blob-fs` 来回切（会触发 feature 统一化补建）。
 - COS 优先：`infra/blob` 在同时启用时以 `cos` 为准（`--all-features` / 误同时打开时）。
-- e2e / 本地快速启动：`cargo run -p biz --no-default-features --features blob-fs`（关 otlp）。
-- 校验 cos 不拉 fs：`cargo tree -p biz --no-default-features --features blob-cos -e features -i blob_kit`（不应出现 `blob_kit/fs`）。
+- e2e / 本地快速启动：`cargo run -p api --no-default-features --features blob-fs`（关 otlp）。
+- 校验 cos 不拉 fs：`cargo tree -p api --no-default-features --features blob-cos -e features -i blob_kit`（不应出现 `blob_kit/fs`）。
 
 ## 威胁模型（公开可读）
 

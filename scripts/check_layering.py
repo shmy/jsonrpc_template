@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Enforce workspace crate layering (see AGENTS.md).
 
-Surfaces: biz/* (C-end) and ops/* (reserved; add when ready).
+Surfaces: api/* (C-end) and admin/* (reserved; add when ready).
 Contracts: contracts/*_contract (shared wire/models).
 
 Forbidden:
-  - biz/* → biz/* | ops/* (implementation crates)
-  - ops/* → ops/* | biz/* (implementation crates)
-  - contracts/* → biz/* | ops/*
-  - biz|ops → http_server
-  - crates/* → biz|ops|contracts|infra
-  - infra/* → biz|ops; contract only via allowlist
+  - api/* → api/* | admin/* (implementation crates)
+  - admin/* → admin/* | api/* (implementation crates)
+  - contracts/* → api/* | admin/*
+  - api|admin → http_server
+  - crates/* → api|admin|contracts|infra
+  - infra/* → api|admin; contract only via allowlist
 
 Allowed infra → *_contract (frozen; new entries need script + AGENTS + rationale):
   - persistence → identity_contract, file_contract  (toasty models! only)
@@ -37,17 +37,17 @@ SIMPLE_PATH_RE = re.compile(
 )
 
 # package name → (layer, kind)
-# layer: bin | biz | ops | contract | infra | crate
+# layer: bin | api | admin | contract | infra | crate
 
 
 def classify(rel: Path) -> tuple[str, str]:
     parts = rel.parts
     if parts[0] == "bin":
         return "bin", parts[1]
-    if parts[0] == "biz":
-        return "biz", parts[1]
-    if parts[0] == "ops":
-        return "ops", parts[1]
+    if parts[0] == "api":
+        return "api", parts[1]
+    if parts[0] == "admin":
+        return "admin", parts[1]
     if parts[0] == "contracts":
         return "contract", parts[1]
     if parts[0] == "infra":
@@ -107,9 +107,9 @@ def main() -> int:
 
     errors: list[str] = []
 
-    biz_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "biz"}
-    ops_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "ops"}
-    surface_impls = biz_impls | ops_impls
+    api_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "api"}
+    admin_impls = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "admin"}
+    surface_impls = api_impls | admin_impls
     contracts = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "contract"}
     infras = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "infra"}
     kits = {n for n, (layer, _, _) in pkg_to_meta.items() if layer == "crate"}
@@ -118,7 +118,7 @@ def main() -> int:
         cargo = member / "Cargo.toml"
         deps = deps_of(cargo) & set(pkg_to_meta.keys())
 
-        if layer in {"biz", "ops"}:
+        if layer in {"api", "admin"}:
             bad_surf = deps & surface_impls - {name}
             if bad_surf:
                 errors.append(
@@ -157,7 +157,7 @@ def main() -> int:
 
     print(
         f"layering OK ({len(pkg_to_meta)} crates; "
-        f"{len(biz_impls)} biz, {len(ops_impls)} ops, {len(contracts)} contracts, "
+        f"{len(api_impls)} api, {len(admin_impls)} admin, {len(contracts)} contracts, "
         f"{len(infras)} infra, {len(kits)} crates)"
     )
     return 0

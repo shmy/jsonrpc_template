@@ -3,7 +3,7 @@
 由 `gen_clients` 从 OpenRPC JSON 生成；目录入库，CI / `just clients-check` 锁漂移。
 
 ```bash
-just gen-clients                 # curl openrpc → 生成（biz 需在听，或用缓存）
+just gen-clients                 # curl openrpc → 生成（api 需在听，或用缓存）
 just clients-check               # 再生成 + git diff + bun session.test.ts
 cargo run -p gen_clients         # 仅生成（需已有 .clients/openrpc.json）
 ```

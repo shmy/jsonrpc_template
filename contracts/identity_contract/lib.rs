@@ -3,7 +3,7 @@
 //! - [`Account`]：toasty 模型（无 `Serialize`）
 //! - [`AccountView`]：RPC wire（o2o 自 `Account`；OpenRPC schema 名同 Rust 类型）
 //!
-//! Layering: `biz/*` / future `ops/*` may depend on this crate only — never on
+//! Layering: `api/*` / future `admin/*` may depend on this crate only — never on
 //! `identity`. This crate must not depend on any surface implementation.
 //! Avatar 绝对 URL 由 identity 的 `FillAvatar` 填充，不进本 crate。
 

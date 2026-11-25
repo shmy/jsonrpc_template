@@ -7,7 +7,7 @@ HTTP：`dart:io` `HttpClient`（零 pub 依赖；Flutter 非 Web）。会话语�
 ## 前置
 
 - Dart SDK ≥ 3.3（或 Flutter SDK）
-- biz 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
+- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟
 

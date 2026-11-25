@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assert bin composition roots: FTL/mapper surfaces before http_server.
 
-Discovers biz/* and ops/* crates that call register_ftl / register_domain_mapper /
+Discovers api/* and admin/* crates that call register_ftl / register_domain_mapper /
 register_locale_bundle, then checks each appears before http_server in each
 bin/*/main.rs that wires http_server.
 """
@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / "bin"
-SURFACES = (ROOT / "biz", ROOT / "ops")
+SURFACES = (ROOT / "api", ROOT / "admin")
 
 MODULE_RE = re.compile(
     r"\.module\(\s*(?P<name>[A-Za-z0-9_]+)\s*::\s*module\s*\(\s*\)\s*\)"
@@ -70,7 +70,7 @@ def check_main(main: Path, required: set[str]) -> list[str]:
             )
     for name in sorted(required - set(modules)):
         # Registered locale in a surface that this binary does not wire — OK
-        # (e.g. ops-only crates when checking bin/biz).
+        # (e.g. admin-only crates when checking bin/api).
         pass
     # Surfaces this binary modules that register locale must be before http_server —
     # covered above. Also: if binary modules a locale surface, it must be in required
@@ -95,7 +95,7 @@ def main() -> int:
     required = surfaces_that_register_locale()
     if not required:
         print(
-            "module-order check FAILED: no biz/ops crate calls register_ftl/"
+            "module-order check FAILED: no api/admin crate calls register_ftl/"
             "register_domain_mapper/register_locale_bundle (scan broken?)",
             file=sys.stderr,
         )

@@ -7,14 +7,14 @@
 ## 前置
 
 - bun，或 Node ≥ 18（`AbortSignal.timeout`）
-- biz 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
+- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟 / 单测
 
 ```bash
 cd .clients/typescript
-bun main.ts            # 需 biz
-bun session.test.ts    # mock fetch，无需 biz
+bun main.ts            # 需 api
+bun session.test.ts    # mock fetch，无需 api
 ```
 
 ## 文件

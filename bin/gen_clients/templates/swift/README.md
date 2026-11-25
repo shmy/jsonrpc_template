@@ -5,7 +5,7 @@
 ## 前置
 
 - macOS + Xcode / Swift toolchain
-- biz 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
+- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟
 

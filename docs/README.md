@@ -18,7 +18,7 @@ docs/openrpc-viewer.js  ──just docs-min（terser）──▶  openrpc-viewer
 ```
 
 改 JS 后：跑 `just docs-min`（需要 node/npx，terser 钉主版本 5 保证产物稳定）。
-`just dev-biz`（cargo watch）侦测到 `min.js` 变化后会因 `include_str!` 依赖自动重编译
+`just dev-api`（cargo watch）侦测到 `min.js` 变化后会因 `include_str!` 依赖自动重编译
 http_server 并重启服务；直接改源 `openrpc-viewer.js` **不会**反映到 `/docs`，
 浏览器强刷（⌘⇧R，内联无缓存协商）前必须先重新生成 min.js。
 

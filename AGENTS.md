@@ -2,27 +2,27 @@
 
 给在本仓库工作的编码代理：优先遵循本文，细节以代码与 `README.md` / `TODO.md` 为准。
 
-**快速入口：** 启动/端点 → [`README.md`](README.md)；加业务 → [`docs/biz-template/`](docs/biz-template/)（`just new-biz <name>`）；blob 后端切换 → [`docs/blob-backends.md`](docs/blob-backends.md)；分层 CI → `just layering`。
+**快速入口：** 启动/端点 → [`README.md`](README.md)；加业务 → [`docs/api-template/`](docs/api-template/)（`just new-api <name>`）；blob 后端切换 → [`docs/blob-backends.md`](docs/blob-backends.md)；分层 CI → `just layering`。
 
 ## 项目是什么
 
 Axum + `modrun` 的 **JSON-RPC 2.0 应用脚手架**。
 
 - **可复用协议核**：`crates/axum_jsonrpc*`（可单独依赖）
-- **应用模板**：`bin/biz` + `biz/` + `contracts/` + `infra/`（`bin/ops` 已建；`ops/` 表面尚未建）
+- **应用模板**：`bin/api` + `api/` + `contracts/` + `infra/`（`bin/admin` 已建；`admin/` 表面尚未建）
 
 默认端点：`POST /jsonrpc`、`GET /openrpc.json`、`GET /livez`、`GET /healthz`、`GET /readyz`、（`blob-fs`）`PUT /files/presigned` + `GET /files/{*path}`（可选 `?s=128|256|512|1024`）；上传走 JSON-RPC `file.presign`。
 
 ## 分层与依赖方向（必须遵守）
 
 ```text
-bin/biz                    # C 端组合根：CLI supply + module 注册
-  → biz/*                  # C 端表面——彼此不互依；勿依赖未来 ops/*
-  → contracts/*            # 跨表面契约（模型等）；biz/ops 唯一可依赖的兄弟层
+bin/api                    # C 端组合根：CLI supply + module 注册
+  → api/*                  # C 端表面——彼此不互依；勿依赖 admin/* 实现
+  → contracts/*            # 跨表面契约（模型等）；api/admin 唯一可依赖的兄弟层
   → infra/*                # 应用壳（http_server、persistence、blob、file_attachment、…）
-  → crates/axum_jsonrpc*   # 协议核（不要反向依赖 biz/ops / 模板 infra）
+  → crates/axum_jsonrpc*   # 协议核（不要反向依赖 api/admin / 模板 infra）
   → crates/{account_id,blob_kit,trace_kit,…}
-# 预留：bin/ops → ops/* → contracts/* → infra → crates（同纪律；ops/* 尚未建）
+# 管理端：bin/admin → admin/* → contracts/* → infra → crates（同纪律；admin/* 表面按需建）
 ```
 
 | 目录 | 职责 | 改动频率 |
@@ -41,22 +41,22 @@ bin/biz                    # C 端组合根：CLI supply + module 注册
 | `infra/http_server` | `Db`+`Cache`+`Blob`+JWT → `AppState`；合并路由、监听、OpenRPC info、中间件、`with_state` | 中 |
 | `crates/account_id` | 账号主键 `Id`（线格式 string / 内存 u64）；壳层与业务直接依赖，contract 不 re-export | 低 |
 | `crates/{authn_kit,jwt_kit,cache_kit}` | 鉴权 key/错误、HS256 JWT、Redis 缓存门面 | 低 |
-| `biz/file` | `file.presign`、（fs）本地预签名 PUT / 回源 / `?s=`（`shared/image_derive` + `endpoints/file_get`）、Lifecycle GC（仅 master） | 中 |
-| `biz/*` | C 端业务 RPC / HTTP | **高（日常应落这里）** |
-| `ops/*` | 管理端表面（**预留**，尚未建目录） | — |
-| `contracts/*` | 跨表面契约（toasty 模型等）；**不**依赖 biz/ops 实现 | 中 |
-| `bin/biz` | C 端组装入口（默认 `otlp`+`blob-fs`；可切 `blob-cos`） | 低 |
-| `bin/ops` | 管理端组装入口（`ops/*` 表面尚未建） | 低 |
-| `bin/migrator` | toasty migration CLI（generate / apply；不经 biz 启动） | 低 |
+| `api/file` | `file.presign`、（fs）本地预签名 PUT / 回源 / `?s=`（`shared/image_derive` + `endpoints/file_get`）、Lifecycle GC（仅 master） | 中 |
+| `api/*` | C 端业务 RPC / HTTP | **高（日常应落这里）** |
+| `admin/*` | 管理端表面（**预留**，尚未建目录） | — |
+| `contracts/*` | 跨表面契约（toasty 模型等）；**不**依赖 api/admin 实现 | 中 |
+| `bin/api` | C 端组装入口（默认 `otlp`+`blob-fs`；可切 `blob-cos`） | 低 |
+| `bin/admin` | 管理端组装入口（`admin/*` 表面尚未建） | 低 |
+| `bin/migrator` | toasty migration CLI（generate / apply；不经 api 启动） | 低 |
 | `bin/gen_clients` | 从 OpenRPC 生成多端客户端（Swift / Kotlin / Dart / TS） | 低 |
 
 **禁止（`just layering` / CI 会拦硬违规）：**
 
-- 让 `axum_jsonrpc` 依赖 `biz`/`ops`、`http_server`、业务类型
+- 让 `axum_jsonrpc` 依赖 `api`/`admin`、`http_server`、业务类型
 - 把 `PublicRpc` / `PrivateRpc` 塞回协议核（它们属于模板侧 `http_routing`）
-- biz/ops 依赖 `http_server`（用 `app_state` / `http_routing` / `axum_jsonrpc` / `locale`）
-- **biz/ops 表面实现互依禁止**——只能依赖 `contracts/*`（例：可用 `identity_contract`，禁止依赖 `identity`）。附件实现走 `infra/file_attachment`（通用绑定编排 `file_attachment::bind` + fresh/stale 时序；identity `avatar_ops` 为薄适配示范，新业务勿复制粘贴它的实现）
-- `contracts/*` 依赖任何 biz/ops 实现，或互相堆业务逻辑（契约保持薄：**wire 形态（新类型/schema/稳定错误码）+ 跨表面共享的纯校验/路径约定**；含副作用的编排与 IO 落表面或 infra）。staging 前缀权威在 `blob_kit::STAGING_PREFIX`；`file_contract::STORAGE_DIR_PREFIX` 为镜像，由 `file` 单测锁死相等
+- api/admin 依赖 `http_server`（用 `app_state` / `http_routing` / `axum_jsonrpc` / `locale`）
+- **api/admin 表面实现互依禁止**——只能依赖 `contracts/*`（例：可用 `identity_contract`，禁止依赖 `identity`）。附件实现走 `infra/file_attachment`（通用绑定编排 `file_attachment::bind` + fresh/stale 时序；identity `avatar_ops` 为薄适配示范，新业务勿复制粘贴它的实现）
+- `contracts/*` 依赖任何 api/admin 实现，或互相堆业务逻辑（契约保持薄：**wire 形态（新类型/schema/稳定错误码）+ 跨表面共享的纯校验/路径约定**；含副作用的编排与 IO 落表面或 infra）。staging 前缀权威在 `blob_kit::STAGING_PREFIX`；`file_contract::STORAGE_DIR_PREFIX` 为镜像，由 `file` 单测锁死相等
 - infra 依赖 `contracts/*`——**仅允许下列例外**（冻结；新增须改 `scripts/check_layering.py` + 本表并写明理由）：
   1. `persistence`：`toasty::models!(…)` **注册**各 `*_contract` 模型（落库壳，不写业务）
   2. `file_attachment`：域错误 / 路径约定借用 `file_contract`（附件实现与 file 契约对齐，勿让表面互依）
@@ -71,7 +71,7 @@ bin/biz                    # C 端组合根：CLI supply + module 注册
 
 表面路由器上的 state 在 merge 时**不会带上**；不要在表面里定制「自以为会生效」的 AppState。
 
-共享资源（池、仓储）放进 `AppState`，用 `State<AppState>` 或 `State<T: FromRef<AppState>>` 提取。保持 `app_state` crate **轻量**（biz/ops 会依赖它）。
+共享资源（池、仓储）放进 `AppState`，用 `State<AppState>` 或 `State<T: FromRef<AppState>>` 提取。保持 `app_state` crate **轻量**（api/admin 会依赖它）。
 
 会话（JWT jti / refresh digest）跨多个 Redis key **无事务**：`issue_tokens` 部分写入失败时可能短暂半开会话；下次 login/refresh 会覆盖 subject 指针并清理旧 digest。每账号单会话模型。refresh **fail-closed**，分两段：
 - **commit 前**并发 `consume`：仅一人 `take` 成功；败者拿不到 `used_*` 时只得 `-32004`，**不**吊销胜者（见 `token_ops` 单测 `concurrent_refresh_does_not_revoke_winner`）
@@ -80,12 +80,12 @@ bin/biz                    # C 端组合根：CLI supply + module 注册
 
 Schema 变更：改 `*_contract` 模型 → `just migration-generate` → 提交 `toasty/` → master 启动或 `just migration-apply`。HTTP 集成测试用 `e2e/*.hurl`（`just e2e` 会清库再跑）；勿用 Rust `#[test]` 打 `/jsonrpc`。
 
-## 扩展 biz 表面
+## 扩展 api 表面
 
-**接线清单（权威、一屏）：** [`docs/biz-template/README.md`](docs/biz-template/README.md)。  
-脚手架：`just new-biz <name>`（复制模板并打印下一步）。默认依赖勿照抄 `identity`。运营面：`bin/ops` 已有组合根；`ops/*` 表面尚未建。
+**接线清单（权威、一屏）：** [`docs/api-template/README.md`](docs/api-template/README.md)。  
+脚手架：`just new-api <name>`（复制模板并打印下一步）。默认依赖勿照抄 `identity`。运营面：`bin/admin` 已有组合根；`admin/*` 表面尚未建。
 
-**多端铺路（尚未建目录）：** C 端 web / 小程序 / 原生 App 与运营 web 是 `bin/biz` / `bin/ops` 的客户端，进可选的 `apps/*` 或独立仓；**不要**塞进 `biz/` / `ops/` 表面目录，也**不要**再占名为 `api/` 的表面根。`.clients/` 继续给各端 SDK。
+**多端：** C 端 web / 小程序 / 原生 App 与管理 Web 是 `bin/api` / `bin/admin` 的客户端，进 `apps/*`（已有 `apps/admin-web`）或独立仓；**不要**塞进 `api/` / `admin/` 表面目录。`.clients/` 继续给各端 SDK。
 
 ### 决策树（何时加什么）
 
@@ -109,7 +109,7 @@ Schema 变更：改 `*_contract` 模型 → `just migration-generate` → 提交
 ### 目录约定
 
 ```text
-biz/<name>/
+api/<name>/
   lib.rs                 # module()、provide_*、Lifecycle；不写业务细节
   methods/mod.rs         # 有 RPC 时必有；声明各 method 子模块
   methods/<action>.rs    # 单文件 ≈ 一个 RPC（req/resp + handler）
@@ -146,7 +146,7 @@ biz/<name>/
 - 套路：
   - Handler / helper：`rootcause::Result`；外库直接 `?`
   - 领域失败：`Err(MyError::….into())`（表面在 `module()` 同步段用 `locale::register_locale_bundle` 成对注册 FTL+mapper；`check_module_order.py` 要求注册 locale 的表面排在 `http_server` 之前；seal 在 `http_server` invoke）
-  - FTL：`biz/<name>/locales/{en-US,zh-CN}/*.ftl`；`Display` / `l10n_key` 即 Fluent key
+  - FTL：`api/<name>/locales/{en-US,zh-CN}/*.ftl`；`Display` / `l10n_key` 即 Fluent key
   - 临时非域错误可直接 `Result<T, ErrorObject>` / `Err(ErrorObject::new(...))`
   - `http_server` 启动前：`register_authn_locale()` → `seal_bundles` + `seal_domain_mappers`；漏注册 mapper 会把域错误打成 `-32603`；seal 后再 `register_*` 会 panic
 - `/jsonrpc` 经 `locale::bind_accept_language`；message 随 `Accept-Language`（如 `en` / `zh-CN` → `en-US` / `zh-CN`）。可选 Cookie `accept_language` **仅语言偏好**，不是会话登录 Cookie
@@ -159,16 +159,16 @@ biz/<name>/
 - RPC span：`jsonrpc.call` / `jsonrpc.batch`，字段 `rpc.*`
 - 关联 id：响应头 `x-request-id`（协议核 `/jsonrpc` 全路径；模板 busy 树 timeout 中间件预解析 `ResolvedRequestId`，覆盖 408 / 外层 413 / PublicRouter，探针除外；入站 `traceparent` → `x-request-id` → 归一化 fallback → mint）。自定义组合根若不用该中间件，需自行插入 `ResolvedRequestId`，或依赖 `RpcRouter::trace_id_fallback`（otel 下 `instrument_router` 已装）
 - 破坏性：无 `attach_trace_id`；勿再读 `error.data.trace_id`；`-32007` 的 `data` 为字符串限额说明
-- Metrics：`RpcObserver`；OTLP 由 **`biz` feature `otlp`**（默认开）门控
-- 本地可关 OTLP：`cargo run -p biz --no-default-features --features blob-fs`（或 `blob-cos`）
+- Metrics：`RpcObserver`；OTLP 由 **`api` feature `otlp`**（默认开）门控
+- 本地可关 OTLP：`cargo run -p api --no-default-features --features blob-fs`（或 `blob-cos`）
 
 ## 编译与改动策略
 
-- **高频改动放叶子**：`biz/*`、必要时 `bin/biz`
+- **高频改动放叶子**：`api/*`、必要时 `bin/api`
 - **少动宽依赖 crate**：改 `axum_jsonrpc` / `app_state` 公开 API 仍要克制（API 稳定是发布层面的承诺）——但**重编成本已实测不是障碍**：check-only 回路下，touch 表面方法只重检 2 个 crate（≈0.4s），touch 协议核全链 8 个也仅 ≈0.6s；最贵路径是 `axum_jsonrpc_macros`（proc-macro codegen，≈1.7s）
 - 依赖尽量 `default-features = false` + 显式 feature（workspace 已如此）
-- 日常迭代：`just check-fast <crate>`（默认 `identity`）或 `just check`（`-p biz`）；**固定一种命令形态**——`-p` / `--workspace --all-targets` / `--all-features` 来回切会触发 feature 统一化补建（0.2–9s）
-- blob 后端只切 `biz` 的 `blob-fs` / `blob-cos`（对齐表：`docs/blob-backends.md`；workspace 已对 `app_state` 等关 default-features，cos 构建不拉 fs）
+- 日常迭代：`just check-fast <crate>`（默认 `identity`）或 `just check`（`-p api`）；**固定一种命令形态**——`-p` / `--workspace --all-targets` / `--all-features` 来回切会触发 feature 统一化补建（0.2–9s）
+- blob 后端只切 `api` 的 `blob-fs` / `blob-cos`（对齐表：`docs/blob-backends.md`；workspace 已对 `app_state` 等关 default-features，cos 构建不拉 fs）
 - 分层：`just layering`（`scripts/check_layering.py` + `check_module_order.py`；亦挂在 `pre_commit` / CI）
 
 ## 代码规范
@@ -188,7 +188,7 @@ biz/<name>/
 - 进程内 TLS（交给反向代理）
 - Cookie session / Web 表单登录（当前为 Bearer JWT + opaque refresh；locale 的 `accept_language` Cookie 只做语言偏好）
 - 泛型化 `AppState` 里的 `TokenHelper`（当前固定 `TokenRealm::Account` 单 realm）——出现第二个 token realm 时再引入注册表 / 多实例，勿提前设计
-- 多 cache 后端、独立 `bin/worker`；`apps/*` 仅文档预留，产品未要求前不要落地；`ops/*` 表面按产品需要再补，勿空建
+- 多 cache 后端、独立 `bin/worker`；`apps/*` 目录已建；表面逻辑按需往 admin/* 加；`admin/*` 表面按产品需要再补，勿空建
 - COS 数据万象 URL 分叉 / 独立图片服务（imgproxy 等）；当前 fs 同进程 `?s=` 派生
 - MFA / 多设备会话 / OIDC
 - 常见/breached 密码 denylist
@@ -199,29 +199,29 @@ biz/<name>/
 
 ```bash
 cp .env.example .env          # 首次；需 Postgres + Redis + JWT_SECRET（≥32）+（blob-fs）BLOB_FS_DOMAIN + BLOB_FS_PRESIGN_SECRET（≥32）
-just db-up                    # compose：仅 postgres + redis（biz 本地跑）
+just db-up                    # compose：仅 postgres + redis（api 本地跑）
 just check-fast identity      # 叶子迭代（固定 -p，勿与 --all-features 交替）
-just check                    # cargo check -p biz（默认 otlp + blob-fs）
+just check                    # cargo check -p api（默认 otlp + blob-fs）
 just layering                 # 分层硬违规
-cargo run -p biz              # 默认 otlp + blob-fs；需 MASTER=true 才 migrate/seed/GC
-cargo run -p biz --no-default-features --features blob-fs
-cargo run -p biz --no-default-features --features blob-cos
+cargo run -p api              # 默认 otlp + blob-fs；需 MASTER=true 才 migrate/seed/GC
+cargo run -p api --no-default-features --features blob-fs
+cargo run -p api --no-default-features --features blob-cos
 just migration-generate       # 模型变更后生成 SQL
-just migration-apply          # 不经 biz 启动、单独 apply
+just migration-apply          # 不经 api 启动、单独 apply
 just migration-reset          # psql DROP SCHEMA + `migrator migration apply`
-just e2e                      # reset → 临时 biz（blob-fs，关 otlp）→ hurl
+just e2e                      # reset → 临时 api（blob-fs，关 otlp）→ hurl
 just clients-check            # 生成物对齐 + bun session.test.ts
 cargo test --workspace --all-targets   # 含 seal 等 integration
 cargo test -p axum_jsonrpc -p identity -p file --lib --features blob-fs
 just pre_commit               # layering + machete + fixrs + fmt + clippy（含 --all-features）
-just dev-biz                  # cargo watch -x "run -p biz"
-just dev-ops                  # cargo watch -x "run -p ops"
+just dev-api                  # cargo watch -x "run -p api"
+just dev-admin                  # cargo watch -x "run -p admin"
 ```
 
 ## 改动检查清单
 
-- [ ] 依赖方向未破坏（`just layering`；核 ← 模板 ← biz/ops；表面之间只经 `contracts/*`）
-- [ ] 新 RPC：默认进 `PrivateRpc`；仅匿名方法进 `PublicRpc`；`bin/biz` 已 `init_group` 且 module 排在 `http_server` 之前
+- [ ] 依赖方向未破坏（`just layering`；核 ← 模板 ← api/admin；表面之间只经 `contracts/*`）
+- [ ] 新 RPC：默认进 `PrivateRpc`；仅匿名方法进 `PublicRpc`；`bin/api` 已 `init_group` 且 module 排在 `http_server` 之前
 - [ ] 业务错误有稳定 `-320xx`（避开协议 `-32007`/`-32010` 与 authn `-32020..`）：`module()` 内 `locale::register_locale_bundle`（漏 mapper 会变 `-32603`；挂在 `http_server` 之后会 seal 后注册 panic）；authn 勿在表面重复注册
 - [ ] `/jsonrpc` 响应带 `x-request-id`；未滥用 `error.data` 传业务字段 / 未再往 body 塞 `trace_id`
 - [ ] AppState：`persistence` 提供 `Db`，`cache` 提供 Redis，`blob` 提供 `Blob`，`http_server` 包成 `AppState` 后 `with_state`；表面只用 `RpcRouter::<AppState>::new()`
@@ -236,7 +236,7 @@ just dev-ops                  # cargo watch -x "run -p ops"
 |------|------|
 | `README.md` | 启动、端点、配置、结构 |
 | `TODO.md` | 路线图与验收标准 |
-| `docs/biz-template/` | 最小 biz 表面骨架（勿抄 identity 依赖图） |
+| `docs/api-template/` | 最小 api 表面骨架（勿抄 identity 依赖图） |
 | `docs/blob-backends.md` | `blob-fs` / `blob-cos` 多 crate 对齐表 |
 | `scripts/check_layering.py` | 分层硬违规检查 |
 | `crates/trace_kit/README.md` | tracing / OTLP |

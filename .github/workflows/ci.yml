@@ -35,14 +35,14 @@ jobs:
           python3 scripts/check_module_order.py
       - name: clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - name: biz default-features
+      - name: api default-features
         # e2e 关 otlp；这里覆盖默认 otlp+blob-fs
-        run: cargo check -p biz --all-targets
-      - name: biz blob-cos (no fs)
+        run: cargo check -p api --all-targets
+      - name: api blob-cos (no fs)
         # 编译期互斥：blob-cos 不得经 default-features 再拉进 blob_kit/fs
         run: |
-          cargo check -p biz --no-default-features --features blob-cos --all-targets
-          tree_out="$(cargo tree -p biz --no-default-features --features blob-cos -e features -i blob_kit)"
+          cargo check -p api --no-default-features --features blob-cos --all-targets
+          tree_out="$(cargo tree -p api --no-default-features --features blob-cos -e features -i blob_kit)"
           if printf '%s\n' "$tree_out" | grep -F 'blob_kit feature "fs"'; then
             echo 'blob-cos build must not enable blob_kit feature "fs"' >&2
             printf '%s\n' "$tree_out" >&2
@@ -117,9 +117,9 @@ jobs:
             "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl_${HURL_VERSION}_amd64.deb"
           sudo apt-get update
           sudo apt-get install -y "./hurl_${HURL_VERSION}_amd64.deb" postgresql-client redis-tools
-      - name: Build migrator + biz
+      - name: Build migrator + api
         run: |
           cargo build --bin migrator
-          cargo build -p biz --no-default-features --features blob-fs
+          cargo build -p api --no-default-features --features blob-fs
       - name: e2e
         run: stdbuf -oL -eL just e2e

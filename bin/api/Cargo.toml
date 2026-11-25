@@ -1,11 +1,11 @@
 [package]
-name = "biz"
+name = "api"
 version = "0.1.0"
 edition = "2024"
 publish = false
 
 [[bin]]
-name = "biz"
+name = "api"
 path = "main.rs"
 
 [features]

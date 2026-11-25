@@ -71,7 +71,7 @@ fn run() -> Result<(), String> {
     let document = args.document.unwrap_or_else(|| out.join("openrpc.json"));
 
     let doc = load_document(&document).map_err(|e| {
-        format!("{e}\n提示: 先 `just gen-clients`（需 biz 在听），或 `--document <openrpc.json>`")
+        format!("{e}\n提示: 先 `just gen-clients`（需 api 在听），或 `--document <openrpc.json>`")
     })?;
     let ir = model::parse_document(&doc)?;
 

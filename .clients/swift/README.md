@@ -5,7 +5,7 @@
 ## 前置
 
 - macOS + Xcode / Swift toolchain
-- biz 在听（seed：`13888888888` / `admin123!`）
+- api 在听（seed：`13888888888` / `admin123!`）
 
 ## 冒烟
 

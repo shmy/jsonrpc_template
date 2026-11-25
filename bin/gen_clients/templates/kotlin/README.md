@@ -8,7 +8,7 @@
 
 - JDK 17+（工程钉 JVM 17 字节码，避免 JDK 25 与 Kotlin target 冲突）
 - Gradle
-- biz 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
+- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟
 

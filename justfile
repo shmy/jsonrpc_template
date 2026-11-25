@@ -3,17 +3,17 @@ set dotenv-load := true
 
 # ── 日常 ──────────────────────────────────────────────
 
-dev-biz:
+dev-api:
     LISTEN_ADDR=0.0.0.0:9000 \
     JWT_SECRET=b01283653c543d145f1bccb77004fc779eed3eebcb48f7fc0bf7de9b37b189f9 \
     BLOB_FS_DOMAIN=http://127.0.0.1:9000/files \
-    cargo watch -x "run -p biz"
+    cargo watch -x "run -p api"
 
-dev-ops:
+dev-admin:
     LISTEN_ADDR=0.0.0.0:9001 \
     JWT_SECRET=3934dbf6c166ad9eeb65da18c422107d215fdbf66cb74f00443e80dbdca52c5a \
     BLOB_FS_DOMAIN=http://127.0.0.1:9001/files \
-    cargo watch -x "run -p ops"
+    cargo watch -x "run -p admin"
 
 db-up:
     docker compose up -d
@@ -40,21 +40,28 @@ lint crate:
     cargo clippy -p {{crate}} --all-targets
 
 check:
-    cargo check -p biz
+    cargo check -p api
 
 # 叶子迭代；勿与 --all-features / 全 workspace 混用（会触发 feature 统一化）
 check-fast crate="identity":
     cargo check -p {{crate}}
 
-# 从 docs/biz-template 复制叶子 biz 表面骨架（不改 workspace / bin/biz）
-new-biz name:
-    python3 scripts/new_biz.py {{name}}
+# 从 docs/api-template 复制叶子 api 表面骨架（不改 workspace / bin/api）
+new-api name:
+    python3 scripts/new_api.py {{name}}
+
+# 兼容旧名
+alias new-app := new-api
+alias new-biz := new-api
+alias dev := dev-api
+alias dev-biz := dev-api
+alias dev-ops := dev-admin
 
 layering:
     python3 scripts/check_layering.py
     python3 scripts/check_module_order.py
 
-# 拉取 /openrpc.json → .clients/（Swift/Kotlin/Dart/TS；biz 需在听；已有缓存可只跑后半段）
+# 拉取 /openrpc.json → .clients/（Swift/Kotlin/Dart/TS；api 需在听；已有缓存可只跑后半段）
 gen-clients url="http://127.0.0.1:9000/openrpc.json":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -129,8 +136,8 @@ e2e:
     : "${CACHE_REDIS_URL:?CACHE_REDIS_URL required}"
     listen="${E2E_LISTEN_ADDR:-127.0.0.1:18080}"
     base_url="${E2E_BASE_URL:-http://${listen}}"
-    biz_bin="${CARGO_TARGET_DIR:-target}/debug/biz"
-    biz_log="${TMPDIR:-/tmp}/jsonrpc-e2e-biz.log"
+    api_bin="${CARGO_TARGET_DIR:-target}/debug/api"
+    api_log="${TMPDIR:-/tmp}/jsonrpc-e2e-api.log"
 
     log "e2e: [1/5] migration-reset"
     just migration-reset
@@ -144,9 +151,9 @@ e2e:
         | nc -N -w 2 127.0.0.1 6379 >/dev/null || true
     fi
 
-    log "e2e: [3/5] build + start biz on $listen"
-    cargo build -p biz --no-default-features --features blob-fs
-    : >"$biz_log"
+    log "e2e: [3/5] build + start api on $listen"
+    cargo build -p api --no-default-features --features blob-fs
+    : >"$api_log"
     # REFRESH_GRACE_TTL=0：关闭宽限，保留「旧 refresh 重放 → -32004 吊销」断言；
     # 宽限幂等路径由 identity token_ops 单测覆盖。
     MASTER=true \
@@ -162,27 +169,27 @@ e2e:
     BLOB_FS_DOMAIN="${base_url}/files" \
     BLOB_FS_PRESIGN_SECRET="${BLOB_FS_PRESIGN_SECRET:-e2e-blob-presign-secret-at-least-32b}" \
     CACHE_REDIS_URL="redis://127.0.0.1:6379/14" \
-      "$biz_bin" --listen-addr "$listen" >>"$biz_log" 2>&1 &
-    biz_pid=$!
+      "$api_bin" --listen-addr "$listen" >>"$api_log" 2>&1 &
+    api_pid=$!
     cleanup() {
-      kill "$biz_pid" 2>/dev/null || true
-      for _ in $(seq 1 50); do kill -0 "$biz_pid" 2>/dev/null || break; sleep 0.1; done
-      kill -9 "$biz_pid" 2>/dev/null || true
-      wait "$biz_pid" 2>/dev/null || true
+      kill "$api_pid" 2>/dev/null || true
+      for _ in $(seq 1 50); do kill -0 "$api_pid" 2>/dev/null || break; sleep 0.1; done
+      kill -9 "$api_pid" 2>/dev/null || true
+      wait "$api_pid" 2>/dev/null || true
     }
     trap cleanup EXIT
 
-    log "e2e: [4/5] wait /healthz (pid=$biz_pid)"
+    log "e2e: [4/5] wait /healthz (pid=$api_pid)"
     ready=0
     for i in $(seq 1 80); do
       if curl -sf "$base_url/healthz" >/dev/null; then
         ready=1
-        log "e2e: biz ready (${i}/80)"
+        log "e2e: api ready (${i}/80)"
         break
       fi
-      if ! kill -0 "$biz_pid" 2>/dev/null; then
-        log "e2e: biz exited before /healthz; log:"
-        cat "$biz_log" >&2 || true
+      if ! kill -0 "$api_pid" 2>/dev/null; then
+        log "e2e: api exited before /healthz; log:"
+        cat "$api_log" >&2 || true
         exit 1
       fi
       if (( i % 10 == 0 )); then
@@ -192,7 +199,7 @@ e2e:
     done
     if [[ "$ready" -ne 1 ]]; then
       log "e2e: /healthz not ready after ~20s; log:"
-      cat "$biz_log" >&2 || true
+      cat "$api_log" >&2 || true
       exit 1
     fi
 
