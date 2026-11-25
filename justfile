@@ -6,6 +6,9 @@ set dotenv-load := true
 dev-biz:
     LISTEN_ADDR=0.0.0.0:9000 cargo watch -x "run -p biz"
 
+dev-ops:
+    LISTEN_ADDR=0.0.0.0:9001 cargo watch -x "run -p ops"
+
 db-up:
     docker compose up -d
 

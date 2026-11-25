@@ -3240,6 +3240,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ops"
+version = "0.1.0"
+dependencies = [
+ "blob",
+ "cache",
+ "config",
+ "file",
+ "http_routing",
+ "http_server",
+ "modrun",
+ "persistence",
+ "probe",
+ "tokio",
+ "trace_kit",
+]
+
+[[package]]
 name = "owo-colors"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

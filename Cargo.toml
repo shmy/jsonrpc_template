@@ -28,7 +28,7 @@ members = [
     "infra/http_routing",
     "infra/http_server",
     "infra/locale",
-    "infra/persistence",
+    "infra/persistence", "bin/ops",
 ]
 resolver = "3"
 
