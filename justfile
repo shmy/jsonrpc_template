@@ -41,9 +41,6 @@ check-fast crate="identity":
 new-biz name:
     python3 scripts/new_biz.py {{name}}
 
-# 兼容旧名
-alias new-app := new-biz
-
 layering:
     python3 scripts/check_layering.py
     python3 scripts/check_module_order.py
