@@ -1597,7 +1597,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gen_mobile_clients"
+name = "gen_clients"
 version = "0.1.0"
 dependencies = [
  "clap",

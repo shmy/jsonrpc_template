@@ -11,7 +11,7 @@ cp .env.example .env
 # 按需改 LISTEN_ADDR / RUST_LOG / DATABASE_URL / CACHE_REDIS_URL / JWT_SECRET / MASTER
 
 cargo run -p biz
-# 或热重载：just dev
+# 或热重载：just dev-biz
 # 依赖：just db-up（compose 仅 Postgres + Redis；宿主机 5433 / 6380）
 # 单独建表 / 升级（不启动 biz）：just migration-apply
 ```
@@ -170,7 +170,9 @@ Batch 请求传 JSON 数组即可；通知（无 `id`）HTTP 体为 JSON `null`�
 
 ```
 bin/biz                 # C 端进程入口：组装 module 并启动
-# bin/ops               # 管理端（预留，尚未建）
+bin/ops                 # 管理端进程入口（ops/* 表面尚未建）
+bin/gen_clients         # 从 OpenRPC 生成 Swift / Kotlin / Dart / TS 客户端
+bin/migrator            # toasty-cli：migration generate / apply
 crates/
   account_id            # 账号主键 Id
   authn_kit             # 会话 key / AuthnError / Verifier
@@ -186,10 +188,10 @@ biz/                    # C 端业务表面（彼此不互依）
   file                  # file.presign +（fs）PUT/回源/`?s=` + GC
   identity              # account CRUD + login/refresh/logout
   probe                 # /livez、/healthz、/readyz
-# ops/                  # 运营端表面（预留；将来 bin/ops）
+# ops/                  # 运营端表面（预留；组合根见 bin/ops）
 # apps/                 # 可选：C Web / 小程序 / 运营 Web（勿进 Cargo；勿塞进 biz/）
 contracts/              # 跨表面契约
-  file_contract         # BlobObject / FileError / derived path
+  file_contract         # File / FileError / derived path
   identity_contract     # Account 模型与领域错误
 infra/
   app_state             # AppState（Db + Cache + Blob + TokenHelper + …）
@@ -203,7 +205,6 @@ infra/
   http_server           # 组装 AppState、合并路由、中间件、监听
   persistence           # Postgres Db；MASTER 时 migrate
   locale                # Fluent + Accept-Language
-bin/migrator            # toasty-cli：migration generate / apply
 toasty/                 # embedded migration 产物
 ```
 
@@ -224,7 +225,8 @@ cargo test --workspace --all-targets  # 单元 + seal 等（不含 HTTP e2e）
 cargo run -p biz          # 另开终端
 just migration-reset      # psql DROP SCHEMA + `migrator migration apply`（需 psql）
 just e2e                  # reset → 临时 biz → hurl（需 hurl、psql、Postgres、Redis、JWT_SECRET）
-just clients-check        # OpenRPC 生成物对齐 + bun session.test.ts
+just gen-clients          # 拉取 /openrpc.json → 生成 .clients/（biz 需在听，或用缓存）
+just clients-check        # 再生成 + git diff 锁漂移 + bun session.test.ts
 ```
 
 方法命名：点分域 `identity.account.create`；API 版本取 `biz` 包版本写入 OpenRPC `info.version`（不在方法名里嵌版本前缀）。

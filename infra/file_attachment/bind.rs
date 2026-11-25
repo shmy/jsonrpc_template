@@ -152,7 +152,7 @@ fn classify<'a>(
 
     let key = blob.strip_public_url_prefix(trimmed);
 
-    // 真外链：原样入库，不登记引用（外链无 blob_objects 行可 detach）。
+    // 真外链：原样入库，不登记引用（外链无 files 行可 detach）。
     if is_external_url(key.as_ref()) {
         if !opts.allow_external {
             return Err(FileError::AttachmentInvalid);

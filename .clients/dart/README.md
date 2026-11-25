@@ -1,13 +1,13 @@
 # Dart JSON-RPC client
 
-由 `gen_mobile_clients` 生成。默认 endpoint：`http://127.0.0.1:19091/jsonrpc`。
+由 `gen_clients` 生成。默认 endpoint：`http://127.0.0.1:19091/jsonrpc`。
 
 HTTP：`dart:io` `HttpClient`（零 pub 依赖；Flutter 非 Web）。会话语义见根 `README.md`。
 
 ## 前置
 
 - Dart SDK ≥ 3.3（或 Flutter SDK）
-- api 在听（seed：`13888888888` / `admin123!`）
+- biz 在听（seed：`13888888888` / `admin123!`）
 
 ## 冒烟
 

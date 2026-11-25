@@ -19,7 +19,7 @@ db-down:
 clients-check:
     #!/usr/bin/env bash
     set -euo pipefail
-    cargo run -q -p gen_mobile_clients
+    cargo run -q -p gen_clients
     if ! git diff --quiet -- .clients/; then
       echo "error: .clients/ drifted from OpenRPC; commit just gen-clients output" >&2
       git diff --stat -- .clients/ >&2
@@ -61,7 +61,7 @@ gen-clients url="http://127.0.0.1:9000/openrpc.json":
       echo "error: cannot fetch {{url}} and no .clients/openrpc.json" >&2
       exit 1
     fi
-    cargo run -p gen_mobile_clients
+    cargo run -p gen_clients
 
 # 改 docs/openrpc-viewer.js 后重生成 min.js（需 node/npx）
 docs-min:

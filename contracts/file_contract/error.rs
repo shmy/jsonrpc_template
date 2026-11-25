@@ -23,7 +23,7 @@ pub enum FileError {
     /// commit：staging 对象不存在或 claim 缺失。
     #[error("file_attachment_not_found")]
     AttachmentNotFound,
-    /// attach/detach：path 未在 blob_objects 登记。
+    /// attach/detach：path 未在 files 登记。
     #[error("file_attachment_not_registered")]
     AttachmentNotRegistered,
     /// 预签名：当前后端无直传语义（如 test 内存后端 / 未配置本地 HMAC）。

@@ -9,7 +9,7 @@
 Axum + `modrun` 的 **JSON-RPC 2.0 应用脚手架**。
 
 - **可复用协议核**：`crates/axum_jsonrpc*`（可单独依赖）
-- **应用模板**：`bin/biz` + `biz/` + `contracts/` + `infra/`（预留 `ops/` 与 `bin/ops`，尚未建）
+- **应用模板**：`bin/biz` + `biz/` + `contracts/` + `infra/`（`bin/ops` 已建；`ops/` 表面尚未建）
 
 默认端点：`POST /jsonrpc`、`GET /openrpc.json`、`GET /livez`、`GET /healthz`、`GET /readyz`、（`blob-fs`）`PUT /files/presigned` + `GET /files/{*path}`（可选 `?s=128|256|512|1024`）；上传走 JSON-RPC `file.presign`。
 
@@ -22,7 +22,7 @@ bin/biz                    # C 端组合根：CLI supply + module 注册
   → infra/*                # 应用壳（http_server、persistence、blob、file_attachment、…）
   → crates/axum_jsonrpc*   # 协议核（不要反向依赖 biz/ops / 模板 infra）
   → crates/{account_id,blob_kit,trace_kit,…}
-# 预留：bin/ops → ops/* → contracts/* → infra → crates（同纪律；目录尚未建）
+# 预留：bin/ops → ops/* → contracts/* → infra → crates（同纪律；ops/* 尚未建）
 ```
 
 | 目录 | 职责 | 改动频率 |
@@ -46,8 +46,9 @@ bin/biz                    # C 端组合根：CLI supply + module 注册
 | `ops/*` | 管理端表面（**预留**，尚未建目录） | — |
 | `contracts/*` | 跨表面契约（toasty 模型等）；**不**依赖 biz/ops 实现 | 中 |
 | `bin/biz` | C 端组装入口（默认 `otlp`+`blob-fs`；可切 `blob-cos`） | 低 |
+| `bin/ops` | 管理端组装入口（`ops/*` 表面尚未建） | 低 |
 | `bin/migrator` | toasty migration CLI（generate / apply；不经 biz 启动） | 低 |
-| `bin/gen_mobile_clients` | 从 OpenRPC 生成移动端客户端 | 低 |
+| `bin/gen_clients` | 从 OpenRPC 生成多端客户端（Swift / Kotlin / Dart / TS） | 低 |
 
 **禁止（`just layering` / CI 会拦硬违规）：**
 
@@ -82,7 +83,7 @@ Schema 变更：改 `*_contract` 模型 → `just migration-generate` → 提交
 ## 扩展 biz 表面
 
 **接线清单（权威、一屏）：** [`docs/biz-template/README.md`](docs/biz-template/README.md)。  
-脚手架：`just new-biz <name>`（复制模板并打印下一步）。默认依赖勿照抄 `identity`。运营面将来用 `ops/` + `bin/ops`（尚未建）。
+脚手架：`just new-biz <name>`（复制模板并打印下一步）。默认依赖勿照抄 `identity`。运营面：`bin/ops` 已有组合根；`ops/*` 表面尚未建。
 
 **多端铺路（尚未建目录）：** C 端 web / 小程序 / 原生 App 与运营 web 是 `bin/biz` / `bin/ops` 的客户端，进可选的 `apps/*` 或独立仓；**不要**塞进 `biz/` / `ops/` 表面目录，也**不要**再占名为 `api/` 的表面根。`.clients/` 继续给各端 SDK。
 
@@ -187,7 +188,7 @@ biz/<name>/
 - 进程内 TLS（交给反向代理）
 - Cookie session / Web 表单登录（当前为 Bearer JWT + opaque refresh；locale 的 `accept_language` Cookie 只做语言偏好）
 - 泛型化 `AppState` 里的 `TokenHelper`（当前固定 `TokenRealm::Account` 单 realm）——出现第二个 token realm 时再引入注册表 / 多实例，勿提前设计
-- 多 cache 后端、独立 `bin/worker`；`bin/ops` / `apps/*` 仅文档预留，产品未要求前不要落地
+- 多 cache 后端、独立 `bin/worker`；`apps/*` 仅文档预留，产品未要求前不要落地；`ops/*` 表面按产品需要再补，勿空建
 - COS 数据万象 URL 分叉 / 独立图片服务（imgproxy 等）；当前 fs 同进程 `?s=` 派生
 - MFA / 多设备会话 / OIDC
 - 常见/breached 密码 denylist
@@ -213,7 +214,8 @@ just clients-check            # 生成物对齐 + bun session.test.ts
 cargo test --workspace --all-targets   # 含 seal 等 integration
 cargo test -p axum_jsonrpc -p identity -p file --lib --features blob-fs
 just pre_commit               # layering + machete + fixrs + fmt + clippy（含 --all-features）
-just dev                      # cargo watch -x "run -p biz"
+just dev-biz                  # cargo watch -x "run -p biz"
+just dev-ops                  # cargo watch -x "run -p ops"
 ```
 
 ## 改动检查清单

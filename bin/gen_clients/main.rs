@@ -4,8 +4,8 @@
 //!
 //! ```bash
 //! just gen-clients
-//! cargo run -p gen_mobile_clients
-//! cargo run -p gen_mobile_clients -- --document path/to/openrpc.json
+//! cargo run -p gen_clients
+//! cargo run -p gen_clients -- --document path/to/openrpc.json
 //! ```
 
 mod dart;
@@ -27,7 +27,7 @@ use std::process::ExitCode;
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "gen_mobile_clients",
+    name = "gen_clients",
     about = "Generate Swift / Kotlin / Dart / TypeScript clients from OpenRPC JSON"
 )]
 struct Args {
@@ -71,7 +71,7 @@ fn run() -> Result<(), String> {
     let document = args.document.unwrap_or_else(|| out.join("openrpc.json"));
 
     let doc = load_document(&document).map_err(|e| {
-        format!("{e}\n提示: 先 `just gen-clients`（需 api 在听），或 `--document <openrpc.json>`")
+        format!("{e}\n提示: 先 `just gen-clients`（需 biz 在听），或 `--document <openrpc.json>`")
     })?;
     let ir = model::parse_document(&doc)?;
 

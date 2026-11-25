@@ -8,7 +8,7 @@ mod models;
 mod path;
 
 pub use error::{FileError, codes};
-pub use models::blob_object::BlobObject;
+pub use models::file::File;
 pub use path::{
     DEFAULT_DERIVE_SIZE, DERIVE_EXTENSION, DERIVE_MARK, DERIVE_SIZES, DERIVE_SIZES_HINT,
     DeriveRequest, LEGACY_DERIVE_MARK, LEGACY_THUMB_SUFFIX, STORAGE_DIR_PREFIX,

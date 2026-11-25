@@ -1,11 +1,11 @@
 # Swift JSON-RPC client
 
-由 `gen_mobile_clients` 生成。默认 endpoint：`http://127.0.0.1:19091/jsonrpc`。会话语义见根 `README.md`。
+由 `gen_clients` 生成。默认 endpoint：`http://127.0.0.1:19091/jsonrpc`。会话语义见根 `README.md`。
 
 ## 前置
 
 - macOS + Xcode / Swift toolchain
-- api 在听（seed：`13888888888` / `admin123!`）
+- biz 在听（seed：`13888888888` / `admin123!`）
 
 ## 冒烟
 

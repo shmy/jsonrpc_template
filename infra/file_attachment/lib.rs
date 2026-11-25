@@ -60,7 +60,7 @@ pub fn attachment_in_use_collector_count() -> usize {
 /// 合并全部已注册收集器的 in-use path。
 ///
 /// 经 [`bind::normalize_column_path`] 归一：本站绝对 URL → 相对 key；真外链丢弃，
-/// 避免脏数据导致安全网对不上 `blob_objects.path`。
+/// 避免脏数据导致安全网对不上 `files.path`。
 pub async fn collect_all_in_use(db: &mut Db, blob: &Blob) -> Result<HashSet<String>> {
     let collectors = in_use_lock().clone();
     let mut out = HashSet::new();
@@ -162,7 +162,7 @@ pub fn filter_gc_candidates(candidates: Vec<String>, in_use: &HashSet<String>) -
 
 /// staging（或公网 URL）→ 正式 path，并登记 `ref_count = 0`。
 ///
-/// 顺序：消费上传者 claim → INSERT `blob_objects` → `mv`。
+/// 顺序：消费上传者 claim → INSERT `files` → `mv`。
 pub async fn commit_staging(
     db: &mut Db,
     blob: &Blob,
@@ -210,17 +210,15 @@ pub fn map_blob_report(err: rootcause::Report) -> rootcause::Report {
 
 async fn insert_registration(db: &mut dyn Executor, path: &str) -> Result<()> {
     // toasty 生成的 schema 无 DEFAULT；显式写 CURRENT_TIMESTAMP。
-    statement(
-        "INSERT INTO blob_objects (path, ref_count, created_at) VALUES ($1, 0, CURRENT_TIMESTAMP)",
-    )
-    .bind(path.to_string())
-    .exec(db)
-    .await?;
+    statement("INSERT INTO files (path, ref_count, created_at) VALUES ($1, 0, CURRENT_TIMESTAMP)")
+        .bind(path.to_string())
+        .exec(db)
+        .await?;
     Ok(())
 }
 
 async fn delete_registration(db: &mut dyn Executor, path: &str) -> Result<()> {
-    statement("DELETE FROM blob_objects WHERE path = $1")
+    statement("DELETE FROM files WHERE path = $1")
         .bind(path.to_string())
         .exec(db)
         .await?;
@@ -231,7 +229,7 @@ async fn delete_registration(db: &mut dyn Executor, path: &str) -> Result<()> {
 pub async fn attach(db: &mut dyn Executor, path: &str) -> Result<()> {
     let affected = statement(
         r#"
-        UPDATE blob_objects
+        UPDATE files
         SET ref_count = ref_count + 1,
             tombstoned_at = NULL
         WHERE path = $1
@@ -250,7 +248,7 @@ pub async fn attach(db: &mut dyn Executor, path: &str) -> Result<()> {
 pub async fn detach(db: &mut dyn Executor, path: &str) -> Result<()> {
     let affected = statement(
         r#"
-        UPDATE blob_objects
+        UPDATE files
         SET
             ref_count = GREATEST(ref_count - 1, 0),
             tombstoned_at = CASE
@@ -280,7 +278,7 @@ pub async fn detach_allowing_missing(db: &mut dyn Executor, path: &str) -> Resul
         {
             tracing::warn!(
                 path,
-                "detach: blob_objects row missing (dirty avatar path); continue delete"
+                "detach: files row missing (dirty avatar path); continue delete"
             );
             Ok(())
         }
@@ -300,7 +298,7 @@ pub async fn list_gc_candidates(db: &mut dyn Executor) -> Result<Vec<String>> {
     let rows = query(
         r#"
         SELECT path
-        FROM blob_objects
+        FROM files
         WHERE
             (
                 ref_count = 0

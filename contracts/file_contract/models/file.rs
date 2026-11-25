@@ -4,7 +4,7 @@ use toasty::Model;
 
 /// 正式对象引用登记（staging 不进表；由 BlobGc 清 staging）。
 #[derive(Debug, Serialize, Model)]
-pub struct BlobObject {
+pub struct File {
     #[key]
     pub path: String,
     pub ref_count: i32,

@@ -1,11 +1,11 @@
 # Swift JSON-RPC client
 
-由 `gen_mobile_clients` 生成。默认 endpoint：`__SERVER__`。会话语义见根 `README.md`。
+由 `gen_clients` 生成。默认 endpoint：`__SERVER__`。会话语义见根 `README.md`。
 
 ## 前置
 
 - macOS + Xcode / Swift toolchain
-- api 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
+- biz 在听（seed：`__SEED_PHONE__` / `__SEED_PASSWORD__`）
 
 ## 冒烟
 

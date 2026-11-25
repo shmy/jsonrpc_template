@@ -1,11 +1,11 @@
-# Generated mobile JSON-RPC clients
+# Generated JSON-RPC clients
 
-由 `gen_mobile_clients` 从 OpenRPC JSON 生成；目录入库，CI / `just clients-check` 锁漂移。
+由 `gen_clients` 从 OpenRPC JSON 生成；目录入库，CI / `just clients-check` 锁漂移。
 
 ```bash
-just gen-clients                 # curl openrpc → 生成（api 需在听，或用缓存）
+just gen-clients                 # curl openrpc → 生成（biz 需在听，或用缓存）
 just clients-check               # 再生成 + git diff + bun session.test.ts
-cargo run -p gen_mobile_clients  # 仅生成（需已有 .clients/openrpc.json）
+cargo run -p gen_clients         # 仅生成（需已有 .clients/openrpc.json）
 ```
 
 | 路径 | 说明 |
@@ -28,4 +28,4 @@ cargo run -p gen_mobile_clients  # 仅生成（需已有 .clients/openrpc.json�
 
 - 无 refresh 时本地抛 auth required（`x-auth: required`）
 - avatar 三态 omit 未建模
-- 冒烟在 `templates/`；会话不变量：`cargo test -p gen_mobile_clients`；TS 行为：`bun session.test.ts`
+- 冒烟在 `templates/`；会话不变量：`cargo test -p gen_clients`；TS 行为：`bun session.test.ts`

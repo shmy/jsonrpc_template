@@ -1,6 +1,6 @@
 # Kotlin JSON-RPC client
 
-由 `gen_mobile_clients` 生成。默认 endpoint：`http://127.0.0.1:19091/jsonrpc`。
+由 `gen_clients` 生成。默认 endpoint：`http://127.0.0.1:19091/jsonrpc`。
 
 依赖：`kotlinx-serialization-json`。会话语义见根 `README.md`。阻塞 HTTP：勿在 Android 主线程调用。
 
@@ -8,7 +8,7 @@
 
 - JDK 17+（工程钉 JVM 17 字节码，避免 JDK 25 与 Kotlin target 冲突）
 - Gradle
-- api 在听（seed：`13888888888` / `admin123!`）
+- biz 在听（seed：`13888888888` / `admin123!`）
 
 ## 冒烟
 

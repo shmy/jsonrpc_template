@@ -2,7 +2,7 @@
 members = [
     "bin/biz",
     "bin/migrator",
-    "bin/gen_mobile_clients",
+    "bin/gen_clients",
     "crates/account_id",
     "crates/authn_kit",
     "crates/axum_jsonrpc",
