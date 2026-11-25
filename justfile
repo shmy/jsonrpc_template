@@ -4,10 +4,16 @@ set dotenv-load := true
 # ── 日常 ──────────────────────────────────────────────
 
 dev-biz:
-    LISTEN_ADDR=0.0.0.0:9000 cargo watch -x "run -p biz"
+    LISTEN_ADDR=0.0.0.0:9000 \
+    JWT_SECRET=b01283653c543d145f1bccb77004fc779eed3eebcb48f7fc0bf7de9b37b189f9 \
+    BLOB_FS_DOMAIN=http://127.0.0.1:9000/files \
+    cargo watch -x "run -p biz"
 
 dev-ops:
-    LISTEN_ADDR=0.0.0.0:9001 cargo watch -x "run -p ops"
+    LISTEN_ADDR=0.0.0.0:9001 \
+    JWT_SECRET=3934dbf6c166ad9eeb65da18c422107d215fdbf66cb74f00443e80dbdca52c5a \
+    BLOB_FS_DOMAIN=http://127.0.0.1:9001/files \
+    cargo watch -x "run -p ops"
 
 db-up:
     docker compose up -d
