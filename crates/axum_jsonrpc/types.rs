@@ -15,9 +15,9 @@ pub mod error_codes {
 
     /// Implementation-defined server errors (aligned with jsonrpsee).
     ///
-    /// **Reserved for this protocol crate** — app authn / business bands must
-    /// not reuse these（模板 authn 用 `-32020..`，identity 用 `-32001..-32009`
-    /// 且跳过 `-32007`）。
+    /// **Reserved for this protocol crate** — template authn / business bands
+    /// must not reuse these（模板 authn 用 `-32020..`，identity 用
+    /// `-32001..-32009` 且跳过 `-32007`）。
     pub const OVERSIZED_REQUEST: i32 = -32007;
     pub const TOO_BIG_BATCH_REQUEST: i32 = -32010;
 }

@@ -1,7 +1,7 @@
 //! 列存 path 附件的通用绑定编排（与具体业务无关）。
 //!
 //! 供任何「列里存 blob object key（或真外链）」的业务复用；identity avatar
-//! 是薄适配示范（`app/identity/shared/avatar_ops.rs`）。
+//! 是薄适配示范（`biz/identity/shared/avatar_ops.rs`）。
 //!
 //! # 入站分类
 //!

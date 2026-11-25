@@ -85,7 +85,7 @@ fn push_ftl_locked(
     registry.push((locale, ftl));
 }
 
-/// Seal Fluent bundles (idempotent). Call from the app shell before serving traffic.
+/// Seal Fluent bundles (idempotent). Call from the composition root before serving traffic.
 pub fn seal_bundles() {
     let _ = bundles();
 }

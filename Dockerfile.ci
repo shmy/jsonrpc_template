@@ -1,8 +1,8 @@
 # https://github.com/GoogleContainerTools/distroless/blob/main/README.md#debian-13
-# 需先 `cargo build -p app --release`；勿 COPY ./app（与源码目录 app/ 撞名）。
+# 需先 `cargo build -p biz --release`；勿 COPY ./biz（与源码目录 biz/ 撞名）。
 FROM gcr.io/distroless/cc-debian13:latest
 WORKDIR /opt
-COPY ./target/release/app /opt/app
+COPY ./target/release/biz /opt/biz
 ARG IMAGE_TAG
 ENV IMAGE_TAG=${IMAGE_TAG}
-ENTRYPOINT ["/opt/app"]
+ENTRYPOINT ["/opt/biz"]

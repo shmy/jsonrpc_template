@@ -37,7 +37,7 @@ pub fn register_domain_mapper(mapper: DomainReportMapper) {
     pending.push(mapper);
 }
 
-/// Seal the mapper list (idempotent). Call from the app shell before serving traffic.
+/// Seal the mapper list (idempotent). Call from the composition root before serving traffic.
 pub fn seal_domain_mappers() {
     let _ = SEALED.get_or_init(|| pending_lock().take().unwrap_or_default());
 }

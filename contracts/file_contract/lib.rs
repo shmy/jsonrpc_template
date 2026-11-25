@@ -1,6 +1,6 @@
 //! File / blob attachment contracts (toasty models + domain errors).
 //!
-//! Layering: `app/*` / future `ops/*` may depend on this crate only — never on
+//! Layering: `biz/*` / future `ops/*` may depend on this crate only — never on
 //! `file`. This crate must not depend on any surface implementation.
 
 mod error;

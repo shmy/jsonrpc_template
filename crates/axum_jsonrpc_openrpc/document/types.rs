@@ -2,7 +2,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-/// Info block for an OpenRPC document (SpringDoc `api-docs` / app metadata).
+/// Info block for an OpenRPC document (SpringDoc `api-docs` / service metadata).
 #[derive(Debug, Clone, Serialize)]
 pub struct OpenRpcInfo {
     pub title: String,

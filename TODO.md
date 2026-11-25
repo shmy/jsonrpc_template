@@ -30,7 +30,7 @@
 - [x] RPC 级 tracing span：`method`、`id`、耗时、成功/错误码
 - [x] RPC 返回关联 id（响应头 `x-request-id`，成功/失败都回）
 - [x] 接入 `rootcause-tracing`
-- [x] 基础 metrics 钩子（`RpcObserver` + app feature `otlp`）
+- [x] 基础 metrics 钩子（`RpcObserver` + biz feature `otlp`）
 
 ## P4 — 测试与工程
 
@@ -50,7 +50,7 @@
 - WebSocket / 订阅（除非产品需要）
 - 规范 introspection（`rpc.discover` 等）——已有 OpenRPC 可替代
 - TLS 终止（默认交给反向代理）
-- 多 cache 后端、双组合根（独立 worker 二进制）
+- 多 cache 后端、独立 worker 二进制；`bin/ops` / `apps/*` 仅预留，产品未要求前不落地
 - COS 数据万象 / 独立图片服务（当前 fs 同进程 `?s=`）
 - MFA / 多设备会话 / OIDC
 - 常见/breached 密码 denylist

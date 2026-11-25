@@ -1,5 +1,5 @@
-//! Optional hook so the app shell can localize `-32602` without the protocol
-//! core depending on `locale`.
+//! Optional hook so the composition root can localize `-32602` without the
+//! protocol core depending on `locale`.
 
 use std::sync::OnceLock;
 
@@ -9,7 +9,7 @@ static INVALID_PARAMS_RENDERER: OnceLock<fn(&InvalidParamsCause) -> String> = On
 
 /// Install a message renderer for invalid-params rejections.
 ///
-/// Call once from the app shell (e.g. `http_server::module`) before serving.
+/// Call once from the composition root (e.g. `http_server::module`) before serving.
 /// Subsequent calls are ignored.
 pub fn set_invalid_params_renderer(provider: fn(&InvalidParamsCause) -> String) {
     let _ = INVALID_PARAMS_RENDERER.set(provider);

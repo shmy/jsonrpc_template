@@ -1,7 +1,7 @@
 //! Template HTTP / JSON-RPC route group wrappers.
 //!
 //! JSON-RPC primitives live in `axum_jsonrpc`; depend on that crate directly
-//! for reusable RPC code. This crate only provides app-level router tags.
+//! for reusable RPC code. This crate only provides template-level router tags.
 //!
 //! Features contribute method tables / route fragments **without** calling
 //! `with_state`; `http_server` merges groups then attaches process [`AppState`].

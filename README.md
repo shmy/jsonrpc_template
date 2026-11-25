@@ -1,6 +1,6 @@
 # JSON-RPC Template
 
-基于 Axum + `modrun` 的 JSON-RPC 2.0 应用脚手架。协议核在 `crates/axum_jsonrpc`，OpenRPC 在 `axum_jsonrpc_openrpc`，C 端业务在 `app/`、契约在 `contracts/`（预留 `ops/`）；自带健康检查与 Bearer 登录示范。
+基于 Axum + `modrun` 的 JSON-RPC 2.0 应用脚手架。协议核在 `crates/axum_jsonrpc`，OpenRPC 在 `axum_jsonrpc_openrpc`，C 端业务在 `biz/`、契约在 `contracts/`（预留 `ops/`）；自带健康检查与 Bearer 登录示范。
 
 ## 快速启动
 
@@ -10,10 +10,10 @@
 cp .env.example .env
 # 按需改 LISTEN_ADDR / RUST_LOG / DATABASE_URL / CACHE_REDIS_URL / JWT_SECRET / MASTER
 
-cargo run -p app
+cargo run -p biz
 # 或热重载：just dev
 # 依赖：just db-up（compose 仅 Postgres + Redis；宿主机 5433 / 6380）
-# 单独建表 / 升级（不启动 app）：just migration-apply
+# 单独建表 / 升级（不启动 biz）：just migration-apply
 ```
 
 默认监听 `http://0.0.0.0:8080`。多实例时只让一个进程 `MASTER=true`（migrate / seed / GC），其余保持默认 `false`。生产反代 / 限流要点见 [`docs/production.md`](docs/production.md)。
@@ -164,12 +164,12 @@ Batch 请求传 JSON 数组即可；通知（无 `id`）HTTP 体为 JSON `null`�
 
 改端口 / 日志级别 / OTLP / JWT / Redis / Blob 只需改 `.env`，无需改代码。完整示例见 [`.env.example`](.env.example)。
 
-关闭 OTLP：`cargo run -p app --no-default-features --features blob-fs`（仍有 console + rootcause-tracing；**须**保留 `blob-fs` 或改开 `blob-cos`）。生产 COS：`cargo run -p app --no-default-features --features blob-cos`。
+关闭 OTLP：`cargo run -p biz --no-default-features --features blob-fs`（仍有 console + rootcause-tracing；**须**保留 `blob-fs` 或改开 `blob-cos`）。生产 COS：`cargo run -p biz --no-default-features --features blob-cos`。
 
 ## Workspace 结构
 
 ```
-bin/app                 # C 端进程入口：组装 module 并启动
+bin/biz                 # C 端进程入口：组装 module 并启动
 # bin/ops               # 管理端（预留，尚未建）
 crates/
   account_id            # 账号主键 Id
@@ -182,11 +182,12 @@ crates/
   image_kit             # 图像派生（decode → max-edge → webp；供 fs `?s=`）
   jwt_kit               # HS256 TokenHelper
   trace_kit             # tracing 初始化 / trace_id / OTLP metrics
-app/                    # C 端表面（彼此不互依）
+biz/                    # C 端业务表面（彼此不互依）
   file                  # file.presign +（fs）PUT/回源/`?s=` + GC
   identity              # account CRUD + login/refresh/logout
   probe                 # /livez、/healthz、/readyz
-# ops/                  # 管理端表面（预留）
+# ops/                  # 运营端表面（预留；将来 bin/ops）
+# apps/                 # 可选：C Web / 小程序 / 运营 Web（勿进 Cargo；勿塞进 biz/）
 contracts/              # 跨表面契约
   file_contract         # BlobObject / FileError / derived path
   identity_contract     # Account 模型与领域错误
@@ -206,27 +207,27 @@ bin/migrator            # toasty-cli：migration generate / apply
 toasty/                 # embedded migration 产物
 ```
 
-**扩展业务：** 抄写 [`docs/app-template/`](docs/app-template/)（最小依赖），细则与禁令见 [`AGENTS.md`](AGENTS.md)。blob 后端只切 `app` 的 `blob-fs` / `blob-cos`（[`docs/blob-backends.md`](docs/blob-backends.md)）。
+**扩展业务：** 抄写 [`docs/biz-template/`](docs/biz-template/)（最小依赖），细则与禁令见 [`AGENTS.md`](AGENTS.md)。blob 后端只切 `biz` 的 `blob-fs` / `blob-cos`（[`docs/blob-backends.md`](docs/blob-backends.md)）。
 
 ## 开发命令
 
 ```bash
-just db-up                # docker compose：仅 Postgres + Redis（app 本地 cargo run）
+just db-up                # docker compose：仅 Postgres + Redis（biz 本地 cargo run）
 just check-fast identity  # 叶子迭代：cargo check -p <crate>（固定形态，勿与 --all-features 交替）
-just check                # cargo check -p app（默认 otlp + blob-fs）
-just layering             # app/ops/contracts/infra/crate 分层硬违规
+just check                # cargo check -p biz（默认 otlp + blob-fs）
+just layering             # biz/ops/contracts/infra/crate 分层硬违规
 just lint identity        # 单 crate：fmt check + clippy
 just pre_commit           # layering + machete + fixrs + fmt + clippy
 just migration-generate   # 从模型生成 migration
 just migration-apply      # 对 DATABASE_URL apply pending migrations
 cargo test --workspace --all-targets  # 单元 + seal 等（不含 HTTP e2e）
-cargo run -p app          # 另开终端
+cargo run -p biz          # 另开终端
 just migration-reset      # psql DROP SCHEMA + `migrator migration apply`（需 psql）
-just e2e                  # reset → 临时 app → hurl（需 hurl、psql、Postgres、Redis、JWT_SECRET）
+just e2e                  # reset → 临时 biz → hurl（需 hurl、psql、Postgres、Redis、JWT_SECRET）
 just clients-check        # OpenRPC 生成物对齐 + bun session.test.ts
 ```
 
-方法命名：点分域 `identity.account.create`；API 版本取 `app` 包版本写入 OpenRPC `info.version`（不在方法名里嵌版本前缀）。
+方法命名：点分域 `identity.account.create`；API 版本取 `biz` 包版本写入 OpenRPC `info.version`（不在方法名里嵌版本前缀）。
 
 ## 路线图
 

@@ -1,5 +1,5 @@
-//! Optional hooks so the app shell can localize standard JSON-RPC messages
-//! without the protocol core depending on `locale`.
+//! Optional hooks so the composition root can localize standard JSON-RPC
+//! messages without the protocol core depending on `locale`.
 
 use std::sync::OnceLock;
 
@@ -17,7 +17,7 @@ static STANDARD_ERROR_MESSAGE: OnceLock<fn(StandardErrorKind) -> String> = OnceL
 
 /// Install a message provider for standard protocol errors.
 ///
-/// Call once from the app shell (e.g. `http_server::module`) before serving.
+/// Call once from the composition root (e.g. `http_server::module`) before serving.
 /// Subsequent calls are ignored.
 pub fn set_standard_error_message(provider: fn(StandardErrorKind) -> String) {
     let _ = STANDARD_ERROR_MESSAGE.set(provider);

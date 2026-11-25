@@ -8,13 +8,13 @@
 //! [`set_internal_error_message`], [`set_standard_error_message`] and
 //! [`set_invalid_params_renderer`] (plus `register_domain_mapper` /
 //! `seal_domain_mappers` under the `rootcause` feature) mutate
-//! **process-global** state: the core stays `locale`-free by letting the app
-//! shell install renderers/mappers at startup instead of threading them
-//! through every call. The trade-off: one process runs **one** configuration —
-//! two `RpcRouter`s in the same process share the same message renderers and
-//! domain mappers, and hooks set after sealing are ignored or panic
-//! (fail-loud). Treat the crate as "one app per process"; do not embed it
-//! twice with different localization needs.
+//! **process-global** state: the core stays `locale`-free by letting the
+//! composition root install renderers/mappers at startup instead of threading
+//! them through every call. The trade-off: one process runs **one**
+//! configuration — two `RpcRouter`s in the same process share the same message
+//! renderers and domain mappers, and hooks set after sealing are ignored or
+//! panic (fail-loud). Treat the crate as "one composition root per process";
+//! do not embed it twice with different localization needs.
 //!
 //! ```ignore
 //! use axum_jsonrpc::{Params, RpcRouter, rpc};

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Dispatch hooks for metrics (OTel stays in app layer, e.g. `http_server`).
+/// Dispatch hooks for metrics (OTel stays in the template layer, e.g. `http_server`).
 pub trait RpcObserver: Send + Sync + 'static {
     fn on_call(&self, method: &str, error_code: Option<i32>, elapsed: Duration);
     fn on_batch(&self, size: usize);

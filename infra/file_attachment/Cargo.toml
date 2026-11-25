@@ -11,7 +11,7 @@ path = "lib.rs"
 workspace = true
 
 [features]
-# 与 app 的 blob-fs / blob-cos 对齐；workspace 依赖 default-features=false，
+# 与 biz 的 blob-fs / blob-cos 对齐；workspace 依赖 default-features=false，
 # 避免 blob-cos 组合根经本 crate 默认再拉进 fs。
 default = ["fs"]
 fs = ["blob_kit/fs"]
