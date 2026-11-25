@@ -3,8 +3,8 @@ set dotenv-load := true
 
 # ── 日常 ──────────────────────────────────────────────
 
-dev:
-    cargo watch -x "run -p biz"
+dev-biz:
+    LISTEN_ADDR=0.0.0.0:9000 cargo watch -x "run -p biz"
 
 db-up:
     docker compose up -d
